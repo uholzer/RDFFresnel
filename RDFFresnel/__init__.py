@@ -8,6 +8,9 @@ from rdflib import URIRef, Graph, Namespace, Literal, BNode, URIRef
 from rdflib.collection import Collection
 from rdflib import plugin
 
+from lxml import etree
+from lxml.builder import ElementMaker
+
 plugin.register(
     'sparql', rdflib.query.Processor,
     'rdfextras.sparql.processor', 'Processor')
@@ -18,6 +21,9 @@ plugin.register(
 fresnel = Namespace("http://www.w3.org/2004/09/fresnel#")
 rdf = Namespace("http://www.w3.org/1999/02/22-rdf-syntax-ns#")
 rdfs = Namespace("http://www.w3.org/2000/01/rdf-schema#")
+sempfres = Namespace("http://www.andonyar.com/rec/2012/sempipe/fresnelextension#")
+
+E = ElementMaker(namespace="http://www.andonyar.com/rec/2012/sempipe/fresnelxml")
 
 class FresnelException(Exception):
     pass
@@ -291,7 +297,7 @@ class Lens(FresnelNode):
 class FallbackLens():
     """If no lens is found in the fresnel Graph, this one is used"""
     def __init__(self):
-        pass
+        self.node = sempfres.FallbackLens
 
     @property
     def purposes(self):
@@ -411,7 +417,11 @@ class ContainerBox(Box):
         pass
 
     def transform(self):
-        pass
+        return etree.ElementTree(
+            E.fresnelresult(
+                *[r.transform() for r in self.resources]
+            )
+        )
 
     def __str__(self):
         return "ContainerBox\n" + \
@@ -441,6 +451,17 @@ class ResourceBox(Box):
         self.label.select()
         for p in self.properties:
             p.select()
+
+    def format(self):
+        pass
+
+    def transform(self):
+        return E.resource(
+            self.label.transform(),
+            *[p.transform() for p in self.properties],
+            lens = self.lens.node,
+            uri = self.resourceNode
+        )
 
     def __str__(self):
         return "ResourceBox\n" + \
@@ -473,6 +494,16 @@ class PropertyBox(Box):
         for v in self.values:
             v.select()
 
+    def format(self):
+        pass
+
+    def transform(self):
+        return E.property(
+            self.label.transform(),
+            *[v.transform() for v in self.values],
+            uri = " ".join(self.propertyDescription.properties)
+        )
+
     def __str__(self):
         return "PropertyBox\n" + \
             self._str_indent("label: " + str(self.label)) + "\n" + \
@@ -503,6 +534,21 @@ class LabelBox(Box):
             for p in self.properties:
                 p.select()
 
+    def format(self):
+        pass
+
+    def transform(self):
+        if self.isManual:
+            return E.label(
+                self.node,
+                lens = self.lens.node
+            )
+        else:
+            return E.label(
+                *[p.transform() for p in self.properties],
+                lens = self.lens.node
+            )
+
     def __str__(self):
         return "LabelBox\n" + \
             self._str_indent(self.node if self.isManual else "\n".join((str(p) for p in self.properties)))
@@ -522,10 +568,25 @@ class ValueBox(Box):
         if self.context.depth == 0:
             self.context.label = True
         if isinstance(self.valueNode, Literal):
-            self.content = Literal            
+            self.content = self.valueNode            
         else:
             self.content = ResourceBox(self.context.clone())
             self.content.select()
+
+    def format(self):
+        pass
+
+    def transform(self):
+        if isinstance(self.content, Box):
+            return E.value(
+                self.content.transform(),
+                type = "resource"
+            )
+        else:
+            return E.value(
+                self.content,
+                type = "literal"
+            )
 
     def __str__(self):
         return "ValueBox\n" + \
