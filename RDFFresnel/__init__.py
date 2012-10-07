@@ -32,7 +32,7 @@ class FresnelCache:
     def __init__(self, fresnelGraph):
         self.fresnelGraph = fresnelGraph
         lensNodes = fresnelGraph.subjects(rdf.type, fresnel.Lens)        
-        self.lenses = list(map(lambda node: Lens(self.fresnelGraph, node), lensNodes))
+        self.lenses = [Lens(self.fresnelGraph, node) for node in lensNodes]
 
 class Context:
     """Rendering Context
@@ -83,6 +83,8 @@ class Context:
 
     def lens(self):
         """Returns the best lens for the baseNode in this context"""
+        assert isinstance(self.baseNode, URIRef) or isinstance(self.baseNode, BNode)
+
         target = self.baseNode # The node we have to find a lens for
         lenses = self.lensCandidates if self.lensCandidates else self.fresnelCache.lenses
         # Reduce to lenses that match
@@ -240,7 +242,9 @@ class Lens(FresnelNode):
         show = self.nodeProp(fresnel.showProperties)
         if not show:
             return []
-        if (show, rdf.type, rdf.List) in self.fresnelGraph:
+        if self.fresnelGraph.objects(show, rdf.first):
+            # Note, that we can not expect a triple (show, rdf.type, rdf.List) 
+            # to be present.
             show = list(Collection(self.fresnelGraph, show))
         else:
             show = (show,)
@@ -252,7 +256,7 @@ class Lens(FresnelNode):
         hide = self.nodeProp(fresnel.hideProperties)
         if not hide:
             return []
-        if (hide, rdf.type, rdf.List) in self.fresnelGraph:
+        if self.fresnelGraph.objects(show, rdf.first):
             hide = list(Collection(self.fresnelGraph, hide))
         else:
             hide = (hide,)
@@ -432,6 +436,7 @@ class ResourceBox(Box):
 
     def __init__(self, context, resourceNode):
         super().__init__(context)
+        assert isinstance(resourceNode, URIRef) or isinstance(resourceNode, BNode)
         self.resourceNode = resourceNode
         self.context.baseNode = resourceNode
         self.label = None
@@ -469,13 +474,14 @@ class ResourceBox(Box):
             self._str_indent("\n".join((str(p) for p in self.properties)))
 
 class PropertyBox(Box):
-    __slots__ = ("propertyDescription", "propertyNode", "valueNodes", "label", "values")
+    __slots__ = ("propertyDescription", "propertyNode", "propValueNodePairs", "valueNodes", "label", "values")
 
-    def __init__(self, context, propertyDescription, valueNodes):
+    def __init__(self, context, propertyDescription, propValueNodePairs):
         super().__init__(context)
         self.propertyDescription = propertyDescription
-        self.valueNodes = valueNodes
         self.label = None
+        self.propValueNodePairs = propValueNodePairs
+        self.valueNodes = [v for (p,v) in propValueNodePairs]
         self.values = []
 
     def select(self):
@@ -570,7 +576,7 @@ class ValueBox(Box):
         if isinstance(self.valueNode, Literal):
             self.content = self.valueNode            
         else:
-            self.content = ResourceBox(self.context.clone())
+            self.content = ResourceBox(self.context.clone(), self.valueNode)
             self.content.select()
 
     def format(self):
@@ -584,7 +590,7 @@ class ValueBox(Box):
             )
         else:
             return E.value(
-                self.content,
+                str(self.content),
                 type = "literal"
             )
 
