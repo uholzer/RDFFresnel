@@ -91,7 +91,7 @@ class Context:
         lensesmatched = list(filter(lambda x: x[1], ((l,l.matches(self,target)) for l in lenses)))
         if not lensesmatched:
             print("warning: fallback lens used for {0}".format(target), file=sys.stderr)
-            return FallbackLens()
+            return FallbackLens(self.fresnelGraph)
         lensesmatched.sort(key=lambda x: x[1])
         # Now get all lenses with maximal quality
         lensesmatched = [x for x in lensesmatched if x[1]==lensesmatched[0][1]]
@@ -300,7 +300,8 @@ class Lens(FresnelNode):
 
 class FallbackLens():
     """If no lens is found in the fresnel Graph, this one is used"""
-    def __init__(self):
+    def __init__(self, fresnelGraph):
+        self.fresnelGraph = fresnelGraph
         self.node = sempfres.FallbackLens
 
     @property
@@ -313,7 +314,7 @@ class FallbackLens():
 
     @property
     def showProperties(self):
-        return list()
+        return [PropertyDescription(self.fresnelGraph, rdfs.label)]
 
     @property
     def hideProperties(self):
@@ -446,23 +447,24 @@ class ResourceBox(Box):
     def select(self):
         # Find a lens for this resource
         self.lens = self.context.lens()
-        # Create a LabelBox (which will find a lens on its own)
-        # (We add a label box to the resource box. This is not part of
-        # the specification.)
-        self.label = LabelBox(self.context.clone(), self.resourceNode)
         # Create list of PropertyBoxes from Lens
         self.properties = PropertyBoxList(self.context.clone(), self.lens)
         # Call select of all PropertyBoxes
-        self.label.select()
         for p in self.properties:
             p.select()
+        # Create a LabelBox (which will find a lens on its own)
+        # (We add a label box to the resource box. This is not part of
+        # the specification.)
+        if not self.context.label:
+            self.label = LabelBox(self.context.clone(), self.resourceNode)
+            self.label.select()
 
     def format(self):
         pass
 
     def transform(self):
         return E.resource(
-            self.label.transform(),
+            self.label.transform() if self.label else "",
             *[p.transform() for p in self.properties],
             lens = self.lens.node,
             uri = self.resourceNode
@@ -485,9 +487,6 @@ class PropertyBox(Box):
         self.values = []
 
     def select(self):
-        # create a LabelBox (which will find a lens on its own)
-        labelNode = self.propertyDescription.label or self.propertyDescription.properties[0]
-        self.label = LabelBox(self.context.clone(label=True), labelNode)
         # For every node in valueNodes create a ValueBox
         newctx = self.context.clone()
         if self.propertyDescription.depth and newctx.depth > self.propertyDescription.depth:
@@ -496,16 +495,20 @@ class PropertyBox(Box):
             newctx.depth -= 1
         self.values = [ValueBox(newctx.clone(), v) for v in self.valueNodes]
         # Call select
-        self.label.select()
         for v in self.values:
             v.select()
+        # create a LabelBox (which will find a lens on its own)
+        labelNode = self.propertyDescription.label or self.propertyDescription.properties[0]
+        if not self.context.label:
+            self.label = LabelBox(self.context.clone(label=True), labelNode)
+            self.label.select()
 
     def format(self):
         pass
 
     def transform(self):
         return E.property(
-            self.label.transform(),
+            self.label.transform() if self.label else "",
             *[v.transform() for v in self.values],
             uri = " ".join(self.propertyDescription.properties)
         )
@@ -523,6 +526,8 @@ class LabelBox(Box):
         self.node = node
         self.properties = []
         self.lens = None
+        self.context.label = True
+        self.context.baseNode = self.node
 
     @property
     def isManual(self):
@@ -533,7 +538,7 @@ class LabelBox(Box):
             pass
         else:
             # Find a lens for this resource
-            self.lens = self.context.clone(baseNode=self.node,label=True).lens()
+            self.lens = self.context.lens()
             # Create list of PropertyBoxes from Lens
             self.properties = PropertyBoxList(self.context.clone(), self.lens)
             # Call select of all PropertyBoxes
