@@ -99,7 +99,7 @@ class Context:
         target = self.baseNode # The node we have to find a lens for
         lenses = self.lensCandidates if self.lensCandidates else self.fresnelCache.lenses
         # Reduce to lenses that match
-        lensesmatched = list(filter(lambda x: x[1], ((l,l.matches(self,target)) for l in lenses)))
+        lensesmatched = list(filter(lambda x: x[1], ((l,self.matches(l,target)) for l in lenses)))
         if not lensesmatched:
             print("warning: fallback lens used for {0}".format(target), file=sys.stderr)
             return FallbackLens(self.fresnelGraph)
@@ -113,6 +113,58 @@ class Context:
         if (len(lensesmatched) > 1):
             print("warning: more than one lens could be used for {0}".format(target), file=sys.stderr)
         return lensesmatched[0][0]
+
+    def matches(self, lof, targetNode, prop=False):
+        """Determines whether the Lens or Format matches the targetNode
+
+        The return value describes the quality of the match
+        using a MatchQuality instance. In case the Lens does not
+        match, None is returned
+
+        lof should be a Lens or a Format. If prop is True, targetNode
+        is treated as property, otherwise as instance."""
+
+        if self.label and not fresnel.labelLens in lof.purposes:
+            return False
+
+        instanceSelectors = lof.instanceSelectors if not prop else tuple()
+        classSelectors = lof.classSelectors if not prop else tuple()
+        propertySelectors = lof.propertySelectors if prop else tuple()
+
+        # We support more than one selector property for a lens. We
+        # look for the best match among them. We collect the qualities
+        # in a list and pick one of the best at the end.
+        matchQualities = list()
+
+        for selector in instanceSelectors:
+            # TODO: SPARQL and FSL queries
+            if targetNode == selector:
+                q = MatchQuality(self)
+                q.reportInstanceMatch()
+                q.reportSimpleSelector()
+                matchQualities.append(q)
+
+        for selector in classSelectors:
+            # TODO: subclass reasoning?
+            # We do not support SPQARQL or path queries for class
+            # selectors, in accordance with the specification.
+            if (targetNode, rdf.type, selector) in self.instanceGraph:
+                q = MatchQuality(self)
+                q.reportClassMatch(selector)
+                q.reportSimpleSelector()
+                matchQualities.append(q)
+
+        for selector in propertySelectors:
+            # TODO: subproperty reasoning?
+            # TODO: SPARQL and FSL queries
+            if targetNode == selector:
+                q = MatchQuality(self)
+                q.reportInstanceMatch()
+                q.reportSimpleSelector()
+                matchQualities.append(q)
+
+        return max(matchQualities) if matchQualities else False
+
 
 class FresnelNode:
     def __init__(self, fresnelGraph, node):
@@ -238,6 +290,23 @@ class Lens(FresnelNode):
         super().__init__(fresnelGraph, node)
 
     @property
+    def instanceSelectors(self):
+        """Returns the values of the fresnel:instanceLensDomain properties."""
+        return self.nodeProps(fresnel.instanceLensDomain)
+
+    @property
+    def classSelectors(self):
+        """Returns the values of the fresnel:classLensDomain properties."""
+        return self.nodeProps(fresnel.classLensDomain)
+
+    @property
+    def propertySelectors(self):
+        """Returns an empty tuple, required by the matching algorithm.
+
+        Lenses never match a property."""
+        return tuple()
+
+    @property
     def purposes(self):
         """Returns a tuple of all purposes of this lens"""
         return self.nodeProps(fresnel.purpose)
@@ -272,39 +341,6 @@ class Lens(FresnelNode):
         else:
             hide = (hide,)
         return [PropertyDescription(self.fresnelGraph, s) for s in hide]
-
-    def matches(self, env, targetNode):
-        """Determines whether the Lens matches the targetNode
-
-        The return value describes the quality of the match
-        using a MatchQuality instance. In case the Lens does not
-        match, None is returned"""
-
-        if env.label and not fresnel.labelLens in self.purposes:
-            return False
-
-        instanceSelectors = self.nodeProps(fresnel.instanceLensDomain)
-        classSelectors = self.nodeProps(fresnel.classLensDomain)
-
-        # We support more than one selector property for a lens. We
-        # look for the best match among them. We collect the qualities
-        # in a list and pick one of the best at the end.
-        matchQualities = list()
-
-        for selector in instanceSelectors:
-            pass #TODO
-
-        for selector in classSelectors:
-            # TODO: subclass reasoning
-            # We do not support SPQARQL or path queries for class
-            # selectors, in accordance with the specification.
-            if (targetNode, rdf.type, selector) in env.instanceGraph:
-                q = MatchQuality(env) # TODO
-                q.reportClassMatch(selector)
-                q.reportSimpleSelector()
-                matchQualities.append(q)
-
-        return max(matchQualities) if matchQualities else False
 
     def __str__(self):
         return "Lens({0})".format(self.node)
@@ -345,6 +381,26 @@ class Group(FresnelNode):
 class Format(FresnelNode):
     def __init__(self, fresnelGraph, node):
         super().__init__(fresnelGraph, node)
+
+    @property
+    def instanceSelectors(self):
+        """Returns the values of the fresnel:instanceFormatDomain properties."""
+        return self.nodeProps(fresnel.instanceFormatDomain)
+
+    @property
+    def classSelectors(self):
+        """Returns the values of the fresnel:classFormatDomain properties."""
+        return self.nodeProps(fresnel.classFormatDomain)
+
+    @property
+    def propertySelectors(self):
+        """Returns the values of the fresnel:propertyFormatDomains properties."""
+        return self.nodeProps(fresnel.propertyFormatDomain)
+
+    @property
+    def purposes(self):
+        """Returns empty tuple, required by the matching algorithm"""
+        return tuple()
 
     @property
     def groups(self):
