@@ -61,12 +61,13 @@ class Context:
     lensGraph:      Graph which contains the lenses
     """
 
-    __slots__ = ("fresnelGraph", "instanceGraph", "baseNode", "group", "lensCandidates", "fresnelCache", "depth", "label")
+    __slots__ = ("fresnelGraph", "instanceGraph", "baseNode", "group", "lensCandidates", "formatCandidates", "fresnelCache", "depth", "label")
     
     def __init__(self, **opts):
         self.baseNode = False
         self.group = False
-        self.lensCandidates = False
+        self.lensCandidates = None
+        self.formatCandidates = None
         self.fresnelCache = False
         self.depth = 1000
         self.label = False
@@ -77,6 +78,7 @@ class Context:
             self.baseNode = other.baseNode
             self.group = other.group
             self.lensCandidates = other.lensCandidates
+            self.formatCandidates = other.formatCandidates
             self.fresnelCache = other.fresnelCache
             self.depth = other.depth
             self.label = other.label
@@ -113,6 +115,24 @@ class Context:
         if (len(lensesmatched) > 1):
             print("warning: more than one lens could be used for {0}".format(target), file=sys.stderr)
         return lensesmatched[0][0]
+
+    def format(self):
+        """Returns the best format for the baseNode in this context, may be None"""
+        assert isinstance(self.baseNode, URIRef) or isinstance(self.baseNode, BNode)
+
+        target = self.baseNode
+        formats = self.formatCandidates if self.formatCandidates else self.fresnelCache.formats
+
+        # Reduce to formats that match
+        formatsmatched = list(filter(lambda x: x[1], ((f,self.matches(f,target)) for f in formats)))
+        if not formatsmatched:
+            return None
+        formatsmatched.sort(key=lambda x: x[1])
+        # Now get all formats with maximal quality
+        formatsmatched = [x for x in formatsmatched if x[1]==formatsmatched[0][1]]
+        if (len(formatsmatched) > 1):
+            print("warning: more than one format could be used for {0}".format(target), file=sys.stderr)
+        return formatsmatched[0][0]
 
     def matches(self, lof, targetNode, prop=False):
         """Determines whether the Lens or Format matches the targetNode
