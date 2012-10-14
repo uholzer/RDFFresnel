@@ -1,5 +1,12 @@
 """Rendering RDF Resources to a XML tree according to Fresnel lenses"""
 
+# Idea for languages:
+# Properties of lenses/formats which take a string can be used more
+# than once in order to use different languages. The corresponding
+# objects will then return a dict of all the literals.
+# Alternatively: Use a BNode in place of a literal in the fresnelGraph
+# to group languages
+
 import sys
 from functools import reduce
 
@@ -33,6 +40,10 @@ class FresnelCache:
         self.fresnelGraph = fresnelGraph
         lensNodes = fresnelGraph.subjects(rdf.type, fresnel.Lens)        
         self.lenses = [Lens(self.fresnelGraph, node) for node in lensNodes]
+        formatNodes = fresnelGraph.subjects(rdf.type, fresnel.Format)        
+        self.formats = [Format(self.fresnelGraph, node) for node in formatNodes]
+        groupNodes = fresnelGraph.subjects(rdf.type, fresnel.Group)        
+        self.groups = [Group(self.fresnelGraph, node) for node in groupNodes]
 
 class Context:
     """Rendering Context
@@ -134,7 +145,7 @@ class FresnelNode:
             raise FresnelException("{0} has no property {1}".format(self, property))
         return result
 
-class LensMatchQuality():
+class MatchQuality():
     """Describes how good a Lens matches.
 
     For the Fresnel specification, see
@@ -266,7 +277,7 @@ class Lens(FresnelNode):
         """Determines whether the Lens matches the targetNode
 
         The return value describes the quality of the match
-        using a LensMatchQuality instance. In case the Lens does not
+        using a MatchQuality instance. In case the Lens does not
         match, None is returned"""
 
         if env.label and not fresnel.labelLens in self.purposes:
@@ -288,7 +299,7 @@ class Lens(FresnelNode):
             # We do not support SPQARQL or path queries for class
             # selectors, in accordance with the specification.
             if (targetNode, rdf.type, selector) in env.instanceGraph:
-                q = LensMatchQuality(env) # TODO
+                q = MatchQuality(env) # TODO
                 q.reportClassMatch(selector)
                 q.reportSimpleSelector()
                 matchQualities.append(q)
@@ -334,6 +345,147 @@ class Group(FresnelNode):
 class Format(FresnelNode):
     def __init__(self, fresnelGraph, node):
         super().__init__(fresnelGraph, node)
+
+    @property
+    def groups(self):
+        """Returns a tuple of all purposes of this lens"""
+        return self.nodeProps(fresnel.group)
+
+    @property
+    def label(self):
+        """Indicates what should be taken as label, or None if not set.
+
+        possible values:
+        fresnel:show (default)
+        fresnel:none
+        a string
+        http://www.w3.org/2005/04/fresnel-info/manual/#labelling"""
+        return self.nodeProp(fresnel.group)
+
+    @property
+    def value(self):
+        """Describes how the value should be displayed. Returns a node if set.
+
+        possible values:
+        fresnel:image
+        fresnel:externalLink
+        fresnel:uri
+        http://www.w3.org/2005/04/fresnel-info/manual/#displayingValues"""
+        return self.nodeProp(fresnel.value)
+
+    @property
+    def resourceStyle(self):
+        """Indicates the style of a resource
+
+        value: a literal of type fresnel:styleClass
+        http://www.w3.org/2005/04/fresnel-info/manual/#csshooking"""
+        return self.nodeProp(fresnel.resourceStyle)
+
+    @property
+    def propertyStyle(self):
+        """Indicates the style of a property
+
+        value: a literal of type fresnel:styleClass
+        http://www.w3.org/2005/04/fresnel-info/manual/#csshooking"""
+        return self.nodeProp(fresnel.propertyStyle)
+
+    @property
+    def labelStyle(self):
+        """Indicates the style of a label
+
+        value: a literal of type fresnel:styleClass
+        http://www.w3.org/2005/04/fresnel-info/manual/#csshooking"""
+        return self.nodeProp(fresnel.resourceStyle)
+
+    @property
+    def valueStyle(self):
+        """Indicates the style of a value
+
+        value: a literal of type fresnel:styleClass
+        http://www.w3.org/2005/04/fresnel-info/manual/#csshooking"""
+        return self.nodeProp(fresnel.valueStyle)
+
+    # Note: containerStyle only exists on groups
+
+    @property
+    def valueFormat(self):
+        """Added content before of after a value box
+
+        This is always a FormatHook"""
+        return self.nodeProp(fresnel.valueStyle)
+
+    @property
+    def propertyFormat(self):
+        """Added content before or after a property box
+
+        This is always a FormatHook"""
+        return self.nodeProp(fresnel.propertyStyle)
+
+    @property
+    def labelFormat(self):
+        """Added content before or after a label box
+
+        This is always a FormatHook"""
+        return self.nodeProp(fresnel.resourceStyle)
+
+    @property
+    def resourceFormat(self):
+        """Added content before or after a resource box
+
+        This is always a FormatHook"""
+        return self.nodeProp(fresnel.resourceStyle)
+
+    def matches(self, env, targetNode):
+        """Determines whether the Format matches the targetNode
+
+        The return value describes the quality of the match
+        using a MatchQuality instance. In case the Format does not
+        match, None is returned"""
+
+    def __str__(self):
+        return "Lens({0})".format(self.node)
+
+class FormatHook(FresnelNode):
+    def __init__(self, fresnelGraph, node):
+        super().__init__(fresnelGraph, node)
+
+    @property
+    def contentBefore(self):
+        """Additional content before the current box
+
+        http://www.w3.org/2005/04/fresnel-info/manual/#additionalcontent"""
+        return self.nodeProp(fresnel.contentBefore)
+
+    @property
+    def contentAfter(self):
+        """Additional content after the current box
+
+        http://www.w3.org/2005/04/fresnel-info/manual/#additionalcontent"""
+        return self.nodeProp(fresnel.contentAfter)
+
+    @property
+    def contentFirst(self):
+        """Additional content at the beginning of a list of boxes,
+        replaces the contentBefore of the first box.
+
+        http://www.w3.org/2005/04/fresnel-info/manual/#additionalcontent"""
+        return self.nodeProp(fresnel.contentFirst)
+
+    @property
+    def contentLast(self):
+        """Additional content at the end of a list of boxes,
+        replaces the contentAfter of the last box.
+
+        http://www.w3.org/2005/04/fresnel-info/manual/#additionalcontent"""
+        return self.nodeProp(fresnel.contentLast)
+
+    @property
+    def contentNoValue(self):
+        """Shown when the property is missing
+
+        http://www.w3.org/2005/04/fresnel-info/manual/#additionalcontent"""
+        return self.nodeProp(fresnel.contentNoValue)
+
 
 class PropertyDescription(FresnelNode):
     __slots__ = ("sublenses", "properties", "depth", "label")
