@@ -116,7 +116,7 @@ class Context:
             print("warning: more than one lens could be used for {0}".format(target), file=sys.stderr)
         return lensesmatched[0][0]
 
-    def fmt(self):
+    def fmt(self, prop=False):
         """Returns the best format for the baseNode in this context, may be None"""
         assert isinstance(self.baseNode, URIRef) or isinstance(self.baseNode, BNode)
 
@@ -124,7 +124,7 @@ class Context:
         fmts = self.fmtCandidates if self.fmtCandidates else self.fresnelCache.fmts
 
         # Reduce to formats that match
-        fmtsmatched = list(filter(lambda x: x[1], ((f,self.matches(f,target)) for f in fmts)))
+        fmtsmatched = list(filter(lambda x: x[1], ((f,self.matches(f,target,prop)) for f in fmts)))
         if not fmtsmatched:
             return None
         fmtsmatched.sort(key=lambda x: x[1])
@@ -133,6 +133,16 @@ class Context:
         if (len(fmtsmatched) > 1):
             print("warning: more than one format could be used for {0}".format(target), file=sys.stderr)
         return fmtsmatched[0][0]
+
+    def propertyfmt(self, propertyNode):
+        """Returns the best format for a property
+
+        This is complicated by the fact that a property may have been
+        created manually (merge, whatever) and therefore not
+        correspond to a real property.
+
+        This will have to be refactored to take a triple."""
+        return self.clone(baseNode=propertyNode).fmt(True)
 
     def matches(self, lof, targetNode, prop=False):
         """Determines whether the Lens or Format matches the targetNode
@@ -177,6 +187,7 @@ class Context:
         for selector in propertySelectors:
             # TODO: subproperty reasoning?
             # TODO: SPARQL and FSL queries
+            print("Property selector test {0} == {1}".format(targetNode, selector))
             if targetNode == selector:
                 q = MatchQuality(self)
                 q.reportInstanceMatch()
@@ -512,13 +523,6 @@ class Format(FresnelNode):
         This is always a FormatHook"""
         return self.nodeProp(fresnel.resourceStyle)
 
-    def matches(self, env, targetNode):
-        """Determines whether the Format matches the targetNode
-
-        The return value describes the quality of the match
-        using a MatchQuality instance. In case the Format does not
-        match, None is returned"""
-
     def __str__(self):
         return "Lens({0})".format(self.node)
 
@@ -622,11 +626,33 @@ class PropertyBoxList():
         return self._properties.__get__(k)
 
 class Box:
-    __slots__ = ("context", "fmt")
+    __slots__ = ("context", "fmt", "style", "contentFirst", "contentBefore", "contentAfter", "contentLast", "contentNoValue")
 
     def __init__(self, context):
+        for s in Box.__slots__: setattr(self, s, None)
         self.context = context
-        self.fmt = None
+
+    def _transform_format():
+        content = []
+        for h in ("contentFirst", "contentBefore", "contentAfter", "contentLast", "contentNoValue"):
+            if getattr(self, h):
+                content.append(E(h, getattr(self, h)))
+        if content or self.style or self.fmt:
+            return E.format(
+                *content,
+                style=self.style,
+                format=str(fmt)
+            )
+        else:
+            return ""
+
+    def _str_fmt(self):
+        return str(
+            (str(self.fmt.node) if self.fmt else None, self.style, 
+            self.contentFirst, self.contentBefore, 
+            self.contentAfter, self.contentLast,
+            self.contentNoValue)
+        )
 
     def _str_indent(self, s):
         return "  " + s.replace("\n", "\n  ")
@@ -655,12 +681,14 @@ class ContainerBox(Box):
     def transform(self):
         return etree.ElementTree(
             E.fresnelresult(
+                self._transform_format(),
                 *[r.transform() for r in self.resources]
             )
         )
 
     def __str__(self):
         return "ContainerBox\n" + \
+            self._str_indent(self._str_fmt()) + "\n" + \
             self._str_indent("\n".join((str(r) for r in self.resources)))
 
 class ResourceBox(Box):
@@ -696,6 +724,7 @@ class ResourceBox(Box):
 
     def transform(self):
         return E.resource(
+            self._transform_format(),
             self.label.transform() if self.label else "",
             *[p.transform() for p in self.properties],
             lens = self.lens.node,
@@ -704,11 +733,12 @@ class ResourceBox(Box):
 
     def __str__(self):
         return "ResourceBox\n" + \
+            self._str_indent(self._str_fmt()) + "\n" + \
             self._str_indent("label: " + str(self.label)) + "\n" + \
             self._str_indent("\n".join((str(p) for p in self.properties)))
 
 class PropertyBox(Box):
-    __slots__ = ("propertyDescription", "propertyNode", "propValueNodePairs", "valueNodes", "label", "values")
+    __slots__ = ("propertyDescription", "propValueNodePairs", "valueNodes", "label", "values")
 
     def __init__(self, context, propertyDescription, propValueNodePairs):
         super().__init__(context)
@@ -736,7 +766,7 @@ class PropertyBox(Box):
             self.label.select()
 
     def portray(self):
-        self.fmt = self.context.fmt()
+        self.fmt = self.context.propertyfmt(self.propertyDescription.properties[0])
         # We have to inform our child boxes about the format we have
         # chosen, since they have none of their own.
         if self.label: self.label.portray(self.fmt)
@@ -744,6 +774,7 @@ class PropertyBox(Box):
 
     def transform(self):
         return E.property(
+            self._transform_format(),
             self.label.transform() if self.label else "",
             *[v.transform() for v in self.values],
             uri = " ".join(self.propertyDescription.properties)
@@ -751,6 +782,7 @@ class PropertyBox(Box):
 
     def __str__(self):
         return "PropertyBox\n" + \
+            self._str_indent(self._str_fmt()) + "\n" + \
             self._str_indent("label: " + str(self.label)) + "\n" + \
             self._str_indent("\n".join((str(v) for v in self.values)))
 
@@ -791,17 +823,20 @@ class LabelBox(Box):
     def transform(self):
         if self.isManual:
             return E.label(
+                self._transform_format(),
                 self.node,
                 lens = self.lens.node
             )
         else:
             return E.label(
+                self._transform_format(),
                 *[p.transform() for p in self.properties],
                 lens = self.lens.node
             )
 
     def __str__(self):
         return "LabelBox\n" + \
+            self._str_indent(self._str_fmt()) + "\n" + \
             self._str_indent(self.node if self.isManual else "\n".join((str(p) for p in self.properties)))
 
 
@@ -835,17 +870,20 @@ class ValueBox(Box):
     def transform(self):
         if isinstance(self.content, Box):
             return E.value(
+                self._transform_format(),
                 self.content.transform(),
                 type = "resource"
             )
         else:
             return E.value(
+                self._transform_format(),
                 str(self.content),
                 type = "literal"
             )
 
     def __str__(self):
         return "ValueBox\n" + \
+            self._str_indent(self._str_fmt()) + "\n" + \
             self._str_indent("resource: " + str(self.content))
         
 
