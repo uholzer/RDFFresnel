@@ -40,8 +40,8 @@ class FresnelCache:
         self.fresnelGraph = fresnelGraph
         lensNodes = fresnelGraph.subjects(rdf.type, fresnel.Lens)        
         self.lenses = [Lens(self.fresnelGraph, node) for node in lensNodes]
-        formatNodes = fresnelGraph.subjects(rdf.type, fresnel.Format)        
-        self.formats = [Format(self.fresnelGraph, node) for node in formatNodes]
+        fmtNodes = fresnelGraph.subjects(rdf.type, fresnel.Format)        
+        self.fmts = [Format(self.fresnelGraph, node) for node in fmtNodes]
         groupNodes = fresnelGraph.subjects(rdf.type, fresnel.Group)        
         self.groups = [Group(self.fresnelGraph, node) for node in groupNodes]
 
@@ -61,13 +61,13 @@ class Context:
     lensGraph:      Graph which contains the lenses
     """
 
-    __slots__ = ("fresnelGraph", "instanceGraph", "baseNode", "group", "lensCandidates", "formatCandidates", "fresnelCache", "depth", "label")
+    __slots__ = ("fresnelGraph", "instanceGraph", "baseNode", "group", "lensCandidates", "fmtCandidates", "fresnelCache", "depth", "label")
     
     def __init__(self, **opts):
         self.baseNode = False
         self.group = False
         self.lensCandidates = None
-        self.formatCandidates = None
+        self.fmtCandidates = None
         self.fresnelCache = False
         self.depth = 1000
         self.label = False
@@ -78,7 +78,7 @@ class Context:
             self.baseNode = other.baseNode
             self.group = other.group
             self.lensCandidates = other.lensCandidates
-            self.formatCandidates = other.formatCandidates
+            self.fmtCandidates = other.fmtCandidates
             self.fresnelCache = other.fresnelCache
             self.depth = other.depth
             self.label = other.label
@@ -116,23 +116,23 @@ class Context:
             print("warning: more than one lens could be used for {0}".format(target), file=sys.stderr)
         return lensesmatched[0][0]
 
-    def format(self):
+    def fmt(self):
         """Returns the best format for the baseNode in this context, may be None"""
         assert isinstance(self.baseNode, URIRef) or isinstance(self.baseNode, BNode)
 
         target = self.baseNode
-        formats = self.formatCandidates if self.formatCandidates else self.fresnelCache.formats
+        fmts = self.fmtCandidates if self.fmtCandidates else self.fresnelCache.fmts
 
         # Reduce to formats that match
-        formatsmatched = list(filter(lambda x: x[1], ((f,self.matches(f,target)) for f in formats)))
-        if not formatsmatched:
+        fmtsmatched = list(filter(lambda x: x[1], ((f,self.matches(f,target)) for f in fmts)))
+        if not fmtsmatched:
             return None
-        formatsmatched.sort(key=lambda x: x[1])
+        fmtsmatched.sort(key=lambda x: x[1])
         # Now get all formats with maximal quality
-        formatsmatched = [x for x in formatsmatched if x[1]==formatsmatched[0][1]]
-        if (len(formatsmatched) > 1):
+        fmtsmatched = [x for x in fmtsmatched if x[1]==fmtsmatched[0][1]]
+        if (len(fmtsmatched) > 1):
             print("warning: more than one format could be used for {0}".format(target), file=sys.stderr)
-        return formatsmatched[0][0]
+        return fmtsmatched[0][0]
 
     def matches(self, lof, targetNode, prop=False):
         """Determines whether the Lens or Format matches the targetNode
@@ -399,6 +399,7 @@ class Group(FresnelNode):
         super().__init__(fresnelGraph, node)
 
 class Format(FresnelNode):
+    # TODO: We should handle values set by Groups!
     def __init__(self, fresnelGraph, node):
         super().__init__(fresnelGraph, node)
 
@@ -621,10 +622,11 @@ class PropertyBoxList():
         return self._properties.__get__(k)
 
 class Box:
-    __slots__ = ("context",)
+    __slots__ = ("context", "fmt")
 
     def __init__(self, context):
         self.context = context
+        self.fmt = None
 
     def _str_indent(self, s):
         return "  " + s.replace("\n", "\n  ")
@@ -646,8 +648,9 @@ class ContainerBox(Box):
             self.resources.append(ResourceBox(newctx, n))
             self.resources[-1].select()
 
-    def format(self):
-        pass
+    def portray(self):
+        # TODO: Formatting the Container Box
+        for n in self.resources: n.portray()
 
     def transform(self):
         return etree.ElementTree(
@@ -687,8 +690,9 @@ class ResourceBox(Box):
             self.label = LabelBox(self.context.clone(), self.resourceNode)
             self.label.select()
 
-    def format(self):
-        pass
+    def portray(self):
+        self.fmt = self.context.fmt()
+        for p in self.properties: p.portray()
 
     def transform(self):
         return E.resource(
@@ -731,8 +735,12 @@ class PropertyBox(Box):
             self.label = LabelBox(self.context.clone(label=True), labelNode)
             self.label.select()
 
-    def format(self):
-        pass
+    def portray(self):
+        self.fmt = self.context.fmt()
+        # We have to inform our child boxes about the format we have
+        # chosen, since they have none of their own.
+        if self.label: self.label.portray(self.fmt)
+        for v in self.values: v.portray(self.fmt)
 
     def transform(self):
         return E.property(
@@ -773,8 +781,12 @@ class LabelBox(Box):
             for p in self.properties:
                 p.select()
 
-    def format(self):
-        pass
+    def portray(self, fmt):
+        """Formatting stage
+
+        Requires the format of the parent as argument, since a LabelBox has no format of its own."""
+        self.fmt = fmt
+        for p in self.properties: p.portray()
 
     def transform(self):
         if self.isManual:
@@ -812,8 +824,13 @@ class ValueBox(Box):
             self.content = ResourceBox(self.context.clone(), self.valueNode)
             self.content.select()
 
-    def format(self):
-        pass
+    def portray(self, fmt):
+        """Formatting stage
+
+        Requires the format of the parent as argument, since a ValueBox has no format of its own."""
+        self.fmt = fmt
+        if isinstance(self.content, Box):
+            self.content.portray()
 
     def transform(self):
         if isinstance(self.content, Box):
