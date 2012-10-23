@@ -483,7 +483,7 @@ class Format(FresnelNode):
 
         value: a literal of type fresnel:styleClass
         http://www.w3.org/2005/04/fresnel-info/manual/#csshooking"""
-        return self.nodeProp(fresnel.resourceStyle)
+        return self.nodeProp(fresnel.labelStyle)
 
     @property
     def valueStyle(self):
@@ -500,31 +500,39 @@ class Format(FresnelNode):
         """Added content before of after a value box
 
         This is always a FormatHook"""
-        return self.nodeProp(fresnel.valueStyle)
+        fmtHook = self.nodeProp(fresnel.valueFormat)
+        if fmtHook: fmtHook = FormatHook(self.fresnelGraph, fmtHook)
+        return fmtHook
 
     @property
     def propertyFormat(self):
         """Added content before or after a property box
 
         This is always a FormatHook"""
-        return self.nodeProp(fresnel.propertyStyle)
+        fmtHook = self.nodeProp(fresnel.propertyFormat)
+        if fmtHook: fmtHook = FormatHook(self.fresnelGraph, fmtHook)
+        return fmtHook
 
     @property
     def labelFormat(self):
         """Added content before or after a label box
 
         This is always a FormatHook"""
-        return self.nodeProp(fresnel.resourceStyle)
+        fmtHook = self.nodeProp(fresnel.labelFormat)
+        if fmtHook: fmtHook = FormatHook(self.fresnelGraph, fmtHook)
+        return fmtHook
 
     @property
     def resourceFormat(self):
         """Added content before or after a resource box
 
         This is always a FormatHook"""
-        return self.nodeProp(fresnel.resourceStyle)
+        fmtHook = self.nodeProp(fresnel.resourceFormat)
+        if fmtHook: fmtHook = FormatHook(self.fresnelGraph, fmtHook)
+        return fmtHook
 
     def __str__(self):
-        return "Lens({0})".format(self.node)
+        return "Format({0})".format(self.node)
 
 class FormatHook(FresnelNode):
     def __init__(self, fresnelGraph, node):
@@ -632,19 +640,29 @@ class Box:
         for s in Box.__slots__: setattr(self, s, None)
         self.context = context
 
-    def _transform_format():
+    def _transform_format(self):
         content = []
-        for h in ("contentFirst", "contentBefore", "contentAfter", "contentLast", "contentNoValue"):
-            if getattr(self, h):
-                content.append(E(h, getattr(self, h)))
+        attrs = dict()
+        for k in ("contentFirst", "contentBefore", "contentAfter", "contentLast", "contentNoValue"):
+            if getattr(self, k):
+                content.append(E(k, str(getattr(self, k))))
+        if self.style: attrs["style"] = str(self.style)
+        if self.fmt: attrs["fmt"] = str(self.fmt.node)
         if content or self.style or self.fmt:
             return E.format(
                 *content,
-                style=self.style,
-                format=str(fmt)
+                **attrs
             )
         else:
             return ""
+
+    def _apply_format_hook(self, hook):
+        if hook:
+            self.conentFirst = hook.contentFirst
+            self.contentBefore = hook.contentBefore
+            self.contentAfter = hook.contentAfter
+            self.contentLast = hook.contentLast
+            self.contentNoValue = hook.contentNoValue
 
     def _str_fmt(self):
         return str(
@@ -720,6 +738,9 @@ class ResourceBox(Box):
 
     def portray(self):
         self.fmt = self.context.fmt()
+        if self.fmt:
+            self.style = self.fmt.resourceStyle
+            self._apply_format_hook(self.fmt.resourceFormat)
         for p in self.properties: p.portray()
 
     def transform(self):
@@ -767,6 +788,9 @@ class PropertyBox(Box):
 
     def portray(self):
         self.fmt = self.context.propertyfmt(self.propertyDescription.properties[0])
+        if self.fmt:
+            self.style = self.fmt.propertyStyle
+            self._apply_format_hook(self.fmt.propertyFormat)
         # We have to inform our child boxes about the format we have
         # chosen, since they have none of their own.
         if self.label: self.label.portray(self.fmt)
@@ -818,6 +842,9 @@ class LabelBox(Box):
 
         Requires the format of the parent as argument, since a LabelBox has no format of its own."""
         self.fmt = fmt
+        if self.fmt:
+            self.style = self.fmt.labelStyle
+            self._apply_format_hook(self.fmt.labelFormat)
         for p in self.properties: p.portray()
 
     def transform(self):
@@ -864,6 +891,9 @@ class ValueBox(Box):
 
         Requires the format of the parent as argument, since a ValueBox has no format of its own."""
         self.fmt = fmt
+        if self.fmt:
+            self.style = self.fmt.valueStyle
+            self._apply_format_hook(self.fmt.valueFormat)
         if isinstance(self.content, Box):
             self.content.portray()
 
