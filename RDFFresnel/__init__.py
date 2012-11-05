@@ -35,6 +35,9 @@ E = ElementMaker(namespace="http://www.andonyar.com/rec/2012/sempipe/fresnelxml"
 class FresnelException(Exception):
     pass
 
+class MultilangLiteral(Literal):
+    pass # TODO
+
 class FresnelCache:
     def __init__(self, fresnelGraph):
         self.fresnelGraph = fresnelGraph
@@ -59,9 +62,11 @@ class Context:
                     May be None. Is set to None when cloning.
     instanceGraph:  Graph which contains the data
     lensGraph:      Graph which contains the lenses
+    langs:          A tuple of acceptable languages, in descending
+                    order of quality
     """
 
-    __slots__ = ("fresnelGraph", "instanceGraph", "baseNode", "group", "lensCandidates", "fmtCandidates", "fresnelCache", "depth", "label")
+    __slots__ = ("fresnelGraph", "instanceGraph", "baseNode", "group", "lensCandidates", "fmtCandidates", "fresnelCache", "depth", "label", "langs")
     
     def __init__(self, **opts):
         self.baseNode = False
@@ -71,6 +76,7 @@ class Context:
         self.fresnelCache = False
         self.depth = 1000
         self.label = False
+        self.langs = ("en",)
         if "other" in opts:
             other = opts["other"]
             self.fresnelGraph = other.fresnelGraph
@@ -82,6 +88,7 @@ class Context:
             self.fresnelCache = other.fresnelCache
             self.depth = other.depth
             self.label = other.label
+            self.langs = other.langs
             del opts["other"] 
         for (k,v) in opts.items():
             setattr(self, k, v)
@@ -196,6 +203,15 @@ class Context:
 
         return max(matchQualities) if matchQualities else False
 
+    def picklang(self, available_langs):
+        """Poor man's language picking
+
+        available_langs: a sequence of languages, unordered"""
+
+        print("Picking language from {}".format(available_langs), file=sys.stderr)
+        matches = [l for l in self.langs if l in available_langs]
+        if (matches): return matches[0]
+        else: return None
 
 class FresnelNode:
     def __init__(self, fresnelGraph, node):
@@ -625,6 +641,8 @@ class PropertyBoxList():
         else:
             prop = descr.properties[0]
             valueNodes = self.context.instanceGraph.objects(self.resourceNode, prop)
+            # TODO: Collapse literal valueNodes with different
+            # languages in a single MultilangLiteral
             return [(descr, [(prop, v) for v in valueNodes])]
 
     def __iter__(self):
@@ -776,6 +794,12 @@ class PropertyBox(Box):
             newctx.depth -= self.propertyDescription.depth
         else:
             newctx.depth -= 1
+        # Language negotiation
+        langs = [v.language for v in self.valueNodes if isinstance(v, Literal)]
+        if (langs):
+            chosen = self.context.picklang(langs)
+            self.valueNodes = [v for v in self.valueNodes if (not isinstance(v, Literal)) or v.language == chosen]
+        # Constructing value boxes
         self.values = [ValueBox(newctx.clone(), v) for v in self.valueNodes]
         # Call select
         for v in self.values:
@@ -905,10 +929,14 @@ class ValueBox(Box):
                 type = "resource"
             )
         else:
+            litinfo = dict()
+            if self.content.language: litinfo["lang"] = self.content.language
+            if self.content.datatype: litinfo["datatype"] = self.content.datatype
             return E.value(
                 self._transform_format(),
                 str(self.content),
-                type = "literal"
+                type = "literal",
+                **litinfo
             )
 
     def __str__(self):
