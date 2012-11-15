@@ -464,7 +464,7 @@ class Format(FresnelNode):
         fresnel:none
         a string
         http://www.w3.org/2005/04/fresnel-info/manual/#labelling"""
-        return self.nodeProp(fresnel.group)
+        return self.nodeProp(fresnel.label)
 
     @property
     def value(self):
@@ -815,6 +815,10 @@ class PropertyBox(Box):
         if self.fmt:
             self.style = self.fmt.propertyStyle
             self._apply_format_hook(self.fmt.propertyFormat)
+            if self.fmt.label==fresnel.none:
+                self.label = None
+            elif isinstance(self.fmt.label, Literal):
+                self.label = LabelBox(self.context.clone(label=True), self.fmt.label)
         # We have to inform our child boxes about the format we have
         # chosen, since they have none of their own.
         if self.label: self.label.portray(self.fmt)
@@ -875,8 +879,7 @@ class LabelBox(Box):
         if self.isManual:
             return E.label(
                 self._transform_format(),
-                self.node,
-                lens = self.lens.node
+                str(self.node)
             )
         else:
             return E.label(
