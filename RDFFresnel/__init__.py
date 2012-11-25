@@ -194,7 +194,6 @@ class Context:
             # TODO: subclass reasoning?
             types = self.instanceGraph.objects(targetNode, rdf.type)
             types = set(itertools.chain(*[self.instanceGraph.transitive_objects(t, rdfs.subClassOf, remember=None) for t in types]))
-            print(types)
             # We do not support SPQARQL or path queries for class
             # selectors, in accordance with the specification.
             if selector in types:
