@@ -9,6 +9,7 @@
 
 import sys
 from functools import reduce
+import itertools
 
 import rdflib
 from rdflib import URIRef, Graph, Namespace, Literal, BNode, URIRef
@@ -190,9 +191,12 @@ class Context:
 
         for selector in classSelectors:
             # TODO: subclass reasoning?
+            types = self.instanceGraph.objects(targetNode, rdf.type)
+            types = set(itertools.chain(*[self.instanceGraph.transitive_objects(t, rdfs.subClassOf, remember=None) for t in types]))
+            print(types)
             # We do not support SPQARQL or path queries for class
             # selectors, in accordance with the specification.
-            if (targetNode, rdf.type, selector) in self.instanceGraph:
+            if selector in types:
                 q = MatchQuality(self)
                 q.reportClassMatch(selector)
                 q.reportSimpleSelector()
