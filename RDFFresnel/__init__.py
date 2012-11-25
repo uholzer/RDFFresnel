@@ -66,7 +66,10 @@ class Context:
                     order of quality
     """
 
-    __slots__ = ("fresnelGraph", "instanceGraph", "baseNode", "group", "lensCandidates", "fmtCandidates", "fresnelCache", "depth", "label", "langs")
+    __slots__ = ("fresnelGraph", "instanceGraph", "baseNode", "group",
+                 "lensCandidates", "fmtCandidates", "fresnelCache",
+                 "depth", "label", "langs", 
+                 "fallbackLens", "fallbackLabelLens")
     
     def __init__(self, **opts):
         self.baseNode = False
@@ -77,6 +80,8 @@ class Context:
         self.depth = 1000
         self.label = False
         self.langs = ("en",)
+        self.fallbackLens = None
+        self.fallbackLabelLens = None
         if "other" in opts:
             other = opts["other"]
             self.fresnelGraph = other.fresnelGraph
@@ -89,6 +94,8 @@ class Context:
             self.depth = other.depth
             self.label = other.label
             self.langs = other.langs
+            self.fallbackLens = other.fallbackLens
+            self.fallbackLabelLens = other.fallbackLabelLens
             del opts["other"] 
         for (k,v) in opts.items():
             setattr(self, k, v)
@@ -110,8 +117,8 @@ class Context:
         # Reduce to lenses that match
         lensesmatched = list(filter(lambda x: x[1], ((l,self.matches(l,target)) for l in lenses)))
         if not lensesmatched:
-            print("warning: fallback lens used for {0}".format(target), file=sys.stderr)
-            return FallbackLens(self.fresnelGraph)
+            print("warning: No lens for {0}".format(target), file=sys.stderr)
+            return self.fallbackLabelLens if self.label else self.fallbackLens
         lensesmatched.sort(key=lambda x: x[1])
         # Now get all lenses with maximal quality
         lensesmatched = [x for x in lensesmatched if x[1]==lensesmatched[0][1]]
@@ -392,35 +399,6 @@ class Lens(FresnelNode):
     def __str__(self):
         return "Lens({0})".format(self.node)
 
-class FallbackLens():
-    """If no lens is found in the fresnel Graph, this one is used"""
-    def __init__(self, fresnelGraph):
-        self.fresnelGraph = fresnelGraph
-        self.node = sempfres.FallbackLens
-
-    @property
-    def purposes(self):
-        return tuple()
-
-    @property
-    def groups(self):
-        return tuple()
-
-    @property
-    def showProperties(self):
-        return [PropertyDescription(self.fresnelGraph, rdfs.label)]
-
-    @property
-    def hideProperties(self):
-        return list()
-
-    def matches(self, env, targetNode):
-        return True
-
-    def __str__(self):
-        return "FallbackLens({0})".format(self.node)
-
-
 class Group(FresnelNode):
     def __init__(self, fresnelGraph, node):
         super().__init__(fresnelGraph, node)
@@ -623,8 +601,8 @@ class PropertyBoxList():
         fresnelGraph = context.fresnelGraph
         instanceGraph = context.instanceGraph
 
-        show = lens.showProperties
-        hide = lens.hideProperties
+        show = lens.showProperties if lens else []
+        hide = lens.hideProperties if lens else []
         # TODO: Expand hide to a set by resolving selectors
         if hide:
             raise FresnelException("fresnel:hide is not yet supported")
@@ -762,12 +740,15 @@ class ResourceBox(Box):
         for p in self.properties: p.portray()
 
     def transform(self):
+        attributes = {}
+        attributes["uri"] = self.resourceNode
+        if self.lens:
+            attributes["lens"] = self.lens.node
         return E.resource(
             self._transform_format(),
             self.label.transform() if self.label else "",
             *[p.transform() for p in self.properties],
-            lens = self.lens.node,
-            uri = self.resourceNode
+            **attributes
         )
 
     def __str__(self):
@@ -882,10 +863,11 @@ class LabelBox(Box):
                 str(self.node)
             )
         else:
+            attributes = { "lens": self.lens.node } if self.lens else {}
             return E.label(
                 self._transform_format(),
                 *[p.transform() for p in self.properties],
-                lens = self.lens.node
+                **attributes
             )
 
     def __str__(self):
