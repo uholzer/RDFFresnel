@@ -126,7 +126,8 @@ class Context:
         if (len(lensesmatched) > 1):
             # If there are more than one candidate, prefere
             # lenses with purpose defaultLens
-            lensesmatched = [x for x in lensesmatched if fresnel.defaultLens in x[0].purposes]
+            lensesmatched_new = [x for x in lensesmatched if fresnel.defaultLens in x[0].purposes]
+            lensesmatched = lensesmatched_new if lensesmatched_new else lensesmatched
         if (len(lensesmatched) > 1):
             print("warning: more than one lens could be used for {0}".format(target), file=sys.stderr)
         return lensesmatched[0][0]
