@@ -722,13 +722,14 @@ class ResourceBox(Box):
         self.lens = None
 
     def select(self):
-        # Find a lens for this resource
-        self.lens = self.context.lens()
-        # Create list of PropertyBoxes from Lens
-        self.properties = PropertyBoxList(self.context.clone(), self.lens)
-        # Call select of all PropertyBoxes
-        for p in self.properties:
-            p.select()
+        if self.context.depth > 0:
+            # Find a lens for this resource
+            self.lens = self.context.lens()
+            # Create list of PropertyBoxes from Lens
+            self.properties = PropertyBoxList(self.context.clone(), self.lens)
+            # Call select of all PropertyBoxes
+            for p in self.properties:
+                p.select()
         # Create a LabelBox (which will find a lens on its own)
         # (We add a label box to the resource box. This is not part of
         # the specification.)
@@ -778,7 +779,7 @@ class PropertyBox(Box):
         if self.propertyDescription.depth and newctx.depth > self.propertyDescription.depth:
             newctx.depth -= self.propertyDescription.depth
         else:
-            newctx.depth -= 1
+            newctx.depth = 0
         # Language negotiation
         langs = [v.language for v in self.valueNodes if isinstance(v, Literal)]
         if (langs):
@@ -891,8 +892,6 @@ class ValueBox(Box):
     def select(self):
         # If self.valueNode is a BNode or URIRef, create a ResourceBox
         # else remember the node as a literal
-        if self.context.depth == 0:
-            self.context.label = True
         if isinstance(self.valueNode, Literal):
             self.content = self.valueNode            
         else:
