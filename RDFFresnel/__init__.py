@@ -788,9 +788,16 @@ class PropertyBox(Box):
         # For every node in valueNodes create a ValueBox
         newctx = self.context.clone()
         if self.propertyDescription.depth and newctx.depth > self.propertyDescription.depth:
-            newctx.depth -= self.propertyDescription.depth
+            # Lens restricts depth more than the current depth
+            newctx.depth = self.propertyDescription.depth
+        elif self.propertyDescription.sublenses:
+            # Sublens given, but depth not restricted or already smaller
+            newctx.depth -= 1
         else:
+            # No sublens allowed
             newctx.depth = 0
+        if self.propertyDescription.sublenses:
+            newctx.lensCandidates = self.propertyDescription.sublenses
         # Language negotiation
         langs = [v.language for v in self.valueNodes if isinstance(v, Literal)]
         if (langs):
