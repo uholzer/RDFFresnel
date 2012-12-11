@@ -30,8 +30,19 @@ fresnel = Namespace("http://www.w3.org/2004/09/fresnel#")
 rdf = Namespace("http://www.w3.org/1999/02/22-rdf-syntax-ns#")
 rdfs = Namespace("http://www.w3.org/2000/01/rdf-schema#")
 sempfres = Namespace("http://www.andonyar.com/rec/2012/sempipe/fresnelextension#")
+fresnelxml = "http://www.andonyar.com/rec/2012/sempipe/fresnelxml"
 
-E = ElementMaker(namespace="http://www.andonyar.com/rec/2012/sempipe/fresnelxml")
+E = ElementMaker(namespace=fresnelxml)
+
+def prettify(tree):
+    tag = lambda localname: "{{{0}}}{1}".format(fresnelxml, localname)
+    for e in tree.iter():
+        print("tag", e.tag)
+        if e.tag in [ tag("resource"), tag("property"), tag("label"), tag("value") ]:
+            e.tail = e.tail or "\n"
+        if e.tag in [ tag("resource"), tag("property"), tag("value") ]:
+            if "type" not in e or e["type"] != "literal":
+                e.text = e.text or "\n"
 
 class FresnelException(Exception):
     pass
