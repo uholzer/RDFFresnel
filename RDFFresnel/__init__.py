@@ -467,6 +467,15 @@ class Format(FresnelNode):
         fresnel:image
         fresnel:externalLink
         fresnel:uri
+        sempfres:parsed
+            Parses a literal if it has a supported datatype.
+            The transform functions support only the type
+            rdf:XMLLiteral. Such a literal is parsed as XML and
+            the resulting nodes are added to the value element as
+            children.
+            (Warning: This may be a security risk in automated tools.)
+        sempfres:parsedForcefullyAsXML
+            Parses a literal always as XML.
         http://www.w3.org/2005/04/fresnel-info/manual/#displayingValues"""
         return self.nodeProp(fresnel.value)
 
@@ -938,9 +947,18 @@ class ValueBox(Box):
             litinfo = dict()
             if self.content.language: litinfo["lang"] = self.content.language
             if self.content.datatype: litinfo["datatype"] = self.content.datatype
+            litcontent = str(self.content)
+            if (self.fmt and
+               ((self.fmt.value == sempfres.parsedForcefullyAsXML) or
+               (self.fmt.value == sempfres.parsed and self.content.datatype == rdf.XMLLiteral))):
+                # Parse
+                parseable = '<xmlliteral xmlns="{0}">{1}</xmlliteral>'.format(str(fresnelxml), litcontent)
+                litcontent = etree.fromstring(parseable)
+            else:
+                litcontent = E.literal(litcontent)
             return E.value(
                 self._transform_format(),
-                str(self.content),
+                litcontent,
                 type = "literal",
                 **litinfo
             )
