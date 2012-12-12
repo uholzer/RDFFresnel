@@ -737,7 +737,7 @@ class ResourceBox(Box):
             # Find a lens for this resource
             self.lens = self.context.lens()
             # Create list of PropertyBoxes from Lens
-            self.properties = PropertyBoxList(self.context.clone(), self.lens)
+            self.properties = PropertyBoxList(self.context.clone(lensCandidates=None), self.lens)
             # Call select of all PropertyBoxes
             for p in self.properties:
                 p.select()
@@ -745,7 +745,7 @@ class ResourceBox(Box):
         # (We add a label box to the resource box. This is not part of
         # the specification.)
         if not self.context.label:
-            self.label = LabelBox(self.context.clone(), self.resourceNode)
+            self.label = LabelBox(self.context.clone(lensCandidates=None), self.resourceNode)
             self.label.select()
 
     def portray(self):
