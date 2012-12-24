@@ -19,12 +19,12 @@ from rdflib import plugin
 from lxml import etree
 from lxml.builder import ElementMaker
 
-plugin.register(
-    'sparql', rdflib.query.Processor,
-    'rdfextras.sparql.processor', 'Processor')
-plugin.register(
-    'sparql', rdflib.query.Result,
-    'rdfextras.sparql.query', 'SPARQLQueryResult')
+#plugin.register(
+#    'sparql', rdflib.query.Processor,
+#    'rdfextras.sparql.processor', 'Processor')
+#plugin.register(
+#    'sparql', rdflib.query.Result,
+#    'rdfextras.sparql.query', 'SPARQLQueryResult')
 
 fresnel = Namespace("http://www.w3.org/2004/09/fresnel#")
 rdf = Namespace("http://www.w3.org/1999/02/22-rdf-syntax-ns#")
