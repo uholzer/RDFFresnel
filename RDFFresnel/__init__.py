@@ -179,7 +179,10 @@ class Context:
         match, None is returned
 
         lof should be a Lens or a Format. If prop is True, targetNode
-        is treated as property, otherwise as instance."""
+        is treated as property, otherwise as instance.
+
+        sparqlSelectors are required to be ASK queries. This is _not_
+        according to the Fresnel specification."""
 
         if self.label and not fresnel.labelLens in lof.purposes:
             return False
@@ -194,7 +197,18 @@ class Context:
         matchQualities = list()
 
         for selector in instanceSelectors:
-            # TODO: SPARQL and FSL queries
+            if isinstance(selector, Literal):
+                # A SPARQL or FSL query
+                if selector.datatype == fresnel.sparqlSelector:
+                    # selector should be a SPARQL ASK
+                    res = self.instanceGraph.query(selector, initBindings={ "?target": targetNode })
+                    if res.askAnswer:
+                        q = MatchQuality(self)
+                        q.reportInstanceMatch()
+                        q.reportRelativeQuery()
+                        matchQualities.append(q)
+                else:
+                    raise FresnelException("Unsupported selector language {}".format(selector.datatype))
             if targetNode == selector:
                 q = MatchQuality(self)
                 q.reportInstanceMatch()
@@ -215,8 +229,19 @@ class Context:
 
         for selector in propertySelectors:
             # TODO: subproperty reasoning?
-            # TODO: SPARQL and FSL queries
             print("Property selector test {0} == {1}".format(targetNode, selector))
+            if isinstance(selector, Literal):
+                # A SPARQL or FSL query
+                if selector.datatype == fresnel.sparqlSelector:
+                    # selector should be a SPARQL ASK
+                    res = self.instanceGraph.query(selector, initBindings={ "?target": targetNode })
+                    if res.askAnswer:
+                        q = MatchQuality(self)
+                        q.reportInstanceMatch()
+                        q.reportRelativeQuery()
+                        matchQualities.append(q)
+                else:
+                    raise FresnelException("Unsupported selector language {}".format(selector.datatype))
             if targetNode == selector:
                 q = MatchQuality(self)
                 q.reportInstanceMatch()
@@ -611,6 +636,16 @@ class PropertyDescription(FresnelNode):
             self.depth = 0
             self.label = None
 
+    @property
+    def uri(self):
+        if isinstance(self.node, BNode):
+            if len(self.properties)==1 and isinstance(self.properties[0], URIRef):
+                return self.properties[0]
+            else:
+                return None
+        else:
+            return str(self.node)
+
 class PropertyBoxList():
     """A list of all properties of a resource as given by a lens"""
     
@@ -632,20 +667,28 @@ class PropertyBoxList():
             raise FresnelException("fresnel:hide is not yet supported")
         # TODO: iterate over show, always dropping elements of hide
         for descr in show:
-            resolved = self.resolveDescription(descr)
-            for r in resolved:
-                self._properties.append(PropertyBox(self.context.clone(), r[0], r[1]))
+            arcs = self.resolveDescription(descr)
+            self._properties.append(PropertyBox(self.context.clone(), descr, arcs))
 
     def resolveDescription(self, descr):
-        """Takes a propertyDescription returns a list of (propertyDescription, [(propertyNode, valueNode), ...])"""
-        if len(descr.properties)!=1 or isinstance(descr.properties[0], Literal):
-            raise FresnelException("PropertyDescriptions and Queries are not yet suppoerted")
-        else:
-            prop = descr.properties[0]
-            valueNodes = self.context.instanceGraph.objects(self.resourceNode, prop)
-            # TODO: Collapse literal valueNodes with different
-            # languages in a single MultilangLiteral
-            return [(descr, [(prop, v) for v in valueNodes])]
+        """Takes a propertyDescription returns a list of arcs, i.e. (propertyNode, valueNode) pairs"""
+        # We support property descriptions with more than one property
+        arcs = []
+        for prop in descr.properties:
+            if isinstance(prop, Literal):
+                # A SPARQL or FSL query
+                if prop.datatype == fresnel.sparqlSelector:
+                    # selector should be a SPARQL SELECT
+                    # It must have the bindings ?prop ?obj in this order.
+                    res = self.context.instanceGraph.query(prop, initBindings={ "?target": self.resourceNode })
+                    for r in res:
+                        arcs.append((r[0],r[1]))
+                else:
+                    raise FresnelException("Unsupported selector language {}".format(prop.datatype))
+            else:
+                valueNodes = self.context.instanceGraph.objects(self.resourceNode, prop)
+                arcs += [(prop, v) for v in valueNodes]
+        return arcs
 
     def __iter__(self):
         return self._properties.__iter__()
@@ -783,14 +826,14 @@ class ResourceBox(Box):
             self._str_indent("\n".join((str(p) for p in self.properties)))
 
 class PropertyBox(Box):
-    __slots__ = ("propertyDescription", "propValueNodePairs", "valueNodes", "label", "values")
+    __slots__ = ("propertyDescription", "arcs", "valueNodes", "label", "values")
 
-    def __init__(self, context, propertyDescription, propValueNodePairs):
+    def __init__(self, context, propertyDescription, arcs):
         super().__init__(context)
         self.propertyDescription = propertyDescription
         self.label = None
-        self.propValueNodePairs = propValueNodePairs
-        self.valueNodes = [v for (p,v) in propValueNodePairs]
+        self.arcs = arcs
+        self.valueNodes = [v for (p,v) in arcs]
         self.values = []
 
     def select(self):
@@ -838,11 +881,12 @@ class PropertyBox(Box):
         for v in self.values: v.portray(self.fmt)
 
     def transform(self):
+        uri_attr = self.propertyDescription.uri
         return E.property(
             self._transform_format(),
             self.label.transform() if self.label else "",
             *[v.transform() for v in self.values],
-            uri = " ".join(self.propertyDescription.properties)
+            **({"uri": uri_attr} if uri_attr else {})
         )
 
     def __str__(self):
