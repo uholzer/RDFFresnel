@@ -416,7 +416,7 @@ class Lens(FresnelNode):
         show = self.nodeProp(fresnel.showProperties)
         if not show:
             return []
-        if self.fresnelGraph.objects(show, rdf.first):
+        if (show, rdf.first, None) in self.fresnelGraph:
             # Note, that we can not expect a triple (show, rdf.type, rdf.List) 
             # to be present.
             show = list(Collection(self.fresnelGraph, show))
@@ -430,7 +430,7 @@ class Lens(FresnelNode):
         hide = self.nodeProp(fresnel.hideProperties)
         if not hide:
             return []
-        if self.fresnelGraph.objects(show, rdf.first):
+        if (show, rdf.first, None) in self.fresnelGraph.objects:
             hide = list(Collection(self.fresnelGraph, hide))
         else:
             hide = (hide,)
