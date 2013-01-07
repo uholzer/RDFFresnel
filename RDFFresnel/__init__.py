@@ -721,7 +721,7 @@ class Box:
 
     def _apply_format_hook(self, hook):
         if hook:
-            self.conentFirst = hook.contentFirst
+            self.contentFirst = hook.contentFirst
             self.contentBefore = hook.contentBefore
             self.contentAfter = hook.contentAfter
             self.contentLast = hook.contentLast
