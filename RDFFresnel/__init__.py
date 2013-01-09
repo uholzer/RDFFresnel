@@ -91,7 +91,7 @@ class Context:
         self.fresnelCache = False
         self.depth = 1000
         self.label = False
-        self.langs = ("en",)
+        self.langs = ("en","en-GB","en-US")
         self.fallbackLens = None
         self.fallbackLabelLens = None
         if "other" in opts:
