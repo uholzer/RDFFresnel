@@ -620,14 +620,39 @@ class FormatHook(FresnelNode):
 
 
 class PropertyDescription(FresnelNode):
-    __slots__ = ("sublenses", "properties", "depth", "label")
+    __slots__ = ("sublenses", "properties", "depth", "label", "alt", "merge")
 
     def __init__(self, fresnelGraph, node):
         """node: property description in fresnel Graph"""
         super().__init__(fresnelGraph, node)
-        if (fresnel.PropertyDescription in self.nodeProps(rdf.type)):
+        if isinstance(self.node, Literal):
+            # A query. Queryies are evaluated later, so we simply put the node
+            # containing the query into self.properties.
+            self.sublenses = ()
+            self.properties = (node,)
+            self.depth = 0
+            self.label = None
+            self.alt = False
+            self.merge = False
+        elif fresnel.PropertyDescription in self.nodeProps(rdf.type):
             self.sublenses = [Lens(fresnelGraph, s) for s in self.nodeProps(fresnel.sublens)]
-            self.properties = self.nodeProps(fresnel.property)
+            props = self.nodeProps(fresnel.property)
+            mergeprops = self.nodeProp(fresnel.mergeProperties)
+            altprops = self.nodeProp(fresnel.alternateProperties)
+            if props:
+                self.properties = tuple(props)
+                self.alt = False
+                self.merge = False
+            elif mergeprops:
+                self.properties = tuple(Collection(mergeprops))
+                self.alt = False
+                self.merge = True
+            elif altprops:
+                self.properties = tuple(Collection(altprops))
+                self.alt = True
+                self.merge = False
+            else:
+                FresnelException("Property description without fresnel:properties, fresnel:mergeProperties or fresnel:alternateProperties")
             self.depth = self.nodeProp(fresnel.depth)
             self.label = self.nodeProp(fresnel.label)
         else:
@@ -635,6 +660,8 @@ class PropertyDescription(FresnelNode):
             self.properties = (node,)
             self.depth = 0
             self.label = None
+            self.alt = False
+            self.merge = False
 
     @property
     def uri(self):
@@ -647,7 +674,10 @@ class PropertyDescription(FresnelNode):
             return str(self.node)
 
 class PropertyBoxList():
-    """A list of all properties of a resource as given by a lens"""
+    """A list of all properties of a resource as given by a lens. This
+    class also takes care of processing property description and
+    property queries the right way, even splitting them up if
+    required."""
     
     __slots__ = ("context", "_properties", "resourceNode", "lens")
 
@@ -668,7 +698,24 @@ class PropertyBoxList():
         # TODO: iterate over show, always dropping elements of hide
         for descr in show:
             arcs = self.resolveDescription(descr)
-            self._properties.append(PropertyBox(self.context.clone(), descr, arcs))
+            # We have to decide whether to split up the described
+            # property into multiple properties.
+            if descr.merge:
+                if arcs:
+                    self._properties.append(PropertyBox(self.context.clone(), BNode(), descr, [v for (_,v) in arcs]))
+            elif descr.alt:
+                # Take the longest prefix from the list arcs such that
+                # all have the same property
+                if arcs:
+                    arcs = [(p,v) for (p,v) in arcs if p == arcs[0][0]]
+                    self._properties.append(PropertyBox(self.context.clone(), arcs[0][0], descr, [v for (_,v) in arcs]))
+            else:
+                # Add properties for every group of arcs with the same
+                # property.
+                for groupp in {p for (p,_) in arcs}:
+                    arcs_for_groupp = [(p,v) for (p,v) in arcs if p == groupp]
+                    if arcs_for_groupp:
+                        self._properties.append(PropertyBox(self.context.clone(), groupp, descr, [v for (_,v) in arcs_for_groupp]))
 
     def resolveDescription(self, descr):
         """Takes a propertyDescription returns a list of arcs, i.e. (propertyNode, valueNode) pairs"""
@@ -826,14 +873,26 @@ class ResourceBox(Box):
             self._str_indent("\n".join((str(p) for p in self.properties)))
 
 class PropertyBox(Box):
-    __slots__ = ("propertyDescription", "arcs", "valueNodes", "label", "values")
+    __slots__ = ("referenceProperty", "propertyDescription", "label", "valueNodes", "values")
 
-    def __init__(self, context, propertyDescription, arcs):
+    def __init__(self, context, referenceProperty, propertyDescription, valueNodes):
+        """
+        referenceProperty: The Box represents this property. If it is
+        a BNode, it is thought to be a constructed property that
+        doesn't exist. In this case it can't be matched by a format or
+        labelLens, but propertyDescription can still refer to a format
+        or set a label.
+        propertyDescription: The PropertyDescription from which this
+        PropertyBox is derived. Some information, like sublenses and
+        label are taken from this.
+        values: The nodes which constitute the values that are shown
+        in this box.
+        """
         super().__init__(context)
+        self.referenceProperty = referenceProperty if isinstance(referenceProperty,URIRef) else None
         self.propertyDescription = propertyDescription
         self.label = None
-        self.arcs = arcs
-        self.valueNodes = [v for (p,v) in arcs]
+        self.valueNodes = valueNodes
         self.values = []
 
     def select(self):
@@ -867,7 +926,8 @@ class PropertyBox(Box):
             self.label.select()
 
     def portray(self):
-        self.fmt = self.context.propertyfmt(self.propertyDescription.properties[0])
+        if self.referenceProperty:
+            self.fmt = self.context.propertyfmt(self.referenceProperty)
         if self.fmt:
             self.style = self.fmt.propertyStyle
             self._apply_format_hook(self.fmt.propertyFormat)
