@@ -510,7 +510,7 @@ class Format(FresnelNode):
 
         value: a literal of type fresnel:styleClass
         http://www.w3.org/2005/04/fresnel-info/manual/#csshooking"""
-        return self.nodeProp(fresnel.resourceStyle)
+        return Style(self.nodeProps(fresnel.resourceStyle))
 
     @property
     def propertyStyle(self):
@@ -518,7 +518,7 @@ class Format(FresnelNode):
 
         value: a literal of type fresnel:styleClass
         http://www.w3.org/2005/04/fresnel-info/manual/#csshooking"""
-        return self.nodeProp(fresnel.propertyStyle)
+        return Style(self.nodeProps(fresnel.propertyStyle))
 
     @property
     def labelStyle(self):
@@ -526,7 +526,7 @@ class Format(FresnelNode):
 
         value: a literal of type fresnel:styleClass
         http://www.w3.org/2005/04/fresnel-info/manual/#csshooking"""
-        return self.nodeProp(fresnel.labelStyle)
+        return Style(self.nodeProps(fresnel.labelStyle))
 
     @property
     def valueStyle(self):
@@ -534,7 +534,7 @@ class Format(FresnelNode):
 
         value: a literal of type fresnel:styleClass
         http://www.w3.org/2005/04/fresnel-info/manual/#csshooking"""
-        return self.nodeProp(fresnel.valueStyle)
+        return Style(self.nodeProp(fresnel.valueStyle))
 
     # Note: containerStyle only exists on groups
 
@@ -576,6 +576,29 @@ class Format(FresnelNode):
 
     def __str__(self):
         return "Format({0})".format(self.node)
+
+class Style:
+    def __init__(self, styleNodes):
+        # None is also a valid value for styleNodes
+        self.nodes = tuple(styleNodes) if styleNodes is not None else tuple()
+        if not all((isinstance(n, Literal) for n in self.nodes)):
+            raise FresnelException("Only literals are supported for styles.")
+
+    @property
+    def cls(self):
+        return " ".join([str(c) for c in self.nodes if c.datatype == fresnel.styleClass])
+
+    @property
+    def style(self):
+        styles = [str(c) for c in self.nodes if c.datatype == fresnel.stylingInstructions]
+        if len(styles) > 1:
+            raise FresnelException("Cocatenation of multiple stylingInstructions is not supported.")
+        return styles[0] if styles else ""
+
+    @property
+    def attrs(self):
+        attrs = {"class": self.cls, "style": self.style}
+        return {k: v for (k,v) in attrs.items() if v}
 
 class FormatHook(FresnelNode):
     def __init__(self, fresnelGraph, node):
@@ -756,7 +779,7 @@ class Box:
         for k in ("contentFirst", "contentBefore", "contentAfter", "contentLast", "contentNoValue"):
             if getattr(self, k):
                 content.append(E(k, str(getattr(self, k))))
-        if self.style: attrs["style"] = str(self.style)
+        if self.style: attrs.update(self.style.attrs)
         if self.fmt: attrs["fmt"] = str(self.fmt.node)
         if content or self.style or self.fmt:
             return E.format(
