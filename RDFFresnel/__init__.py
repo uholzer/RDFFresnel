@@ -196,57 +196,60 @@ class Context:
         # in a list and pick one of the best at the end.
         matchQualities = list()
 
-        for selector in instanceSelectors:
-            if isinstance(selector, Literal):
-                # A SPARQL or FSL query
-                if selector.datatype == fresnel.sparqlSelector:
-                    # selector should be a SPARQL ASK
-                    res = self.instanceGraph.query(selector, initBindings={ "?target": targetNode })
-                    if res.askAnswer:
-                        q = MatchQuality(self)
-                        q.reportInstanceMatch()
-                        q.reportRelativeQuery()
-                        matchQualities.append(q)
-                else:
-                    raise FresnelException("Unsupported selector language {}".format(selector.datatype))
-            if targetNode == selector:
-                q = MatchQuality(self)
-                q.reportInstanceMatch()
-                q.reportSimpleSelector()
-                matchQualities.append(q)
+        try:
+            for selector in instanceSelectors:
+                if isinstance(selector, Literal):
+                    # A SPARQL or FSL query
+                    if selector.datatype == fresnel.sparqlSelector:
+                        # selector should be a SPARQL ASK
+                        res = self.instanceGraph.query(selector, initBindings={ "?target": targetNode })
+                        if res.askAnswer:
+                            q = MatchQuality(self)
+                            q.reportInstanceMatch()
+                            q.reportRelativeQuery()
+                            matchQualities.append(q)
+                    else:
+                        raise FresnelException("Unsupported selector language {}".format(selector.datatype))
+                if targetNode == selector:
+                    q = MatchQuality(self)
+                    q.reportInstanceMatch()
+                    q.reportSimpleSelector()
+                    matchQualities.append(q)
 
-        for selector in classSelectors:
-            # TODO: subclass reasoning?
-            types = self.instanceGraph.objects(targetNode, rdf.type)
-            types = set(itertools.chain(*[self.instanceGraph.transitive_objects(t, rdfs.subClassOf, remember=None) for t in types]))
-            # We do not support SPQARQL or path queries for class
-            # selectors, in accordance with the specification.
-            if selector in types:
-                q = MatchQuality(self)
-                q.reportClassMatch(selector)
-                q.reportSimpleSelector()
-                matchQualities.append(q)
+            for selector in classSelectors:
+                # TODO: subclass reasoning?
+                types = self.instanceGraph.objects(targetNode, rdf.type)
+                types = set(itertools.chain(*[self.instanceGraph.transitive_objects(t, rdfs.subClassOf, remember=None) for t in types]))
+                # We do not support SPQARQL or path queries for class
+                # selectors, in accordance with the specification.
+                if selector in types:
+                    q = MatchQuality(self)
+                    q.reportClassMatch(selector)
+                    q.reportSimpleSelector()
+                    matchQualities.append(q)
 
-        for selector in propertySelectors:
-            # TODO: subproperty reasoning?
-            print("Property selector test {0} == {1}".format(targetNode, selector))
-            if isinstance(selector, Literal):
-                # A SPARQL or FSL query
-                if selector.datatype == fresnel.sparqlSelector:
-                    # selector should be a SPARQL ASK
-                    res = self.instanceGraph.query(selector, initBindings={ "?target": targetNode })
-                    if res.askAnswer:
-                        q = MatchQuality(self)
-                        q.reportInstanceMatch()
-                        q.reportRelativeQuery()
-                        matchQualities.append(q)
-                else:
-                    raise FresnelException("Unsupported selector language {}".format(selector.datatype))
-            if targetNode == selector:
-                q = MatchQuality(self)
-                q.reportInstanceMatch()
-                q.reportSimpleSelector()
-                matchQualities.append(q)
+            for selector in propertySelectors:
+                # TODO: subproperty reasoning?
+                print("Property selector test {0} == {1}".format(targetNode, selector))
+                if isinstance(selector, Literal):
+                    # A SPARQL or FSL query
+                    if selector.datatype == fresnel.sparqlSelector:
+                        # selector should be a SPARQL ASK
+                        res = self.instanceGraph.query(selector, initBindings={ "?target": targetNode })
+                        if res.askAnswer:
+                            q = MatchQuality(self)
+                            q.reportInstanceMatch()
+                            q.reportRelativeQuery()
+                            matchQualities.append(q)
+                    else:
+                        raise FresnelException("Unsupported selector language {}".format(selector.datatype))
+                if targetNode == selector:
+                    q = MatchQuality(self)
+                    q.reportInstanceMatch()
+                    q.reportSimpleSelector()
+                    matchQualities.append(q)
+        except:
+            raise FresnelException("Error while matching Lens or Format {} against {}".format(str(lof), str(targetNode)))
 
         return max(matchQualities) if matchQualities else False
 
@@ -744,7 +747,10 @@ class PropertyBoxList():
                 if prop.datatype == fresnel.sparqlSelector:
                     # selector should be a SPARQL SELECT
                     # It must have the bindings ?prop ?obj in this order.
-                    res = self.context.instanceGraph.query(prop, initBindings={ "?target": self.resourceNode })
+                    try:
+                        res = self.context.instanceGraph.query(prop, initBindings={ "?target": self.resourceNode })
+                    except:
+                        raise FresnelException("Error while resolving sparqlSelector\n{}".format(str(prop)) )
                     for r in res:
                         if not (r[0] is None or isinstance(r[0], URIRef)):
                             raise FresnelException("SPARQL query returned a literal or a blank node as ?prop")
