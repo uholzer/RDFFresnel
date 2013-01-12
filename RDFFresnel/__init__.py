@@ -686,16 +686,6 @@ class PropertyDescription(FresnelNode):
             self.alt = False
             self.merge = False
 
-    @property
-    def uri(self):
-        if isinstance(self.node, BNode):
-            if len(self.properties)==1 and isinstance(self.properties[0], URIRef):
-                return self.properties[0]
-            else:
-                return None
-        else:
-            return str(self.node)
-
 class PropertyBoxList():
     """A list of all properties of a resource as given by a lens. This
     class also takes care of processing property description and
@@ -725,7 +715,7 @@ class PropertyBoxList():
             # property into multiple properties.
             if descr.merge:
                 if arcs:
-                    self._properties.append(PropertyBox(self.context.clone(), BNode(), descr, [v for (_,v) in arcs]))
+                    self._properties.append(PropertyBox(self.context.clone(), None, descr, [v for (_,v) in arcs]))
             elif descr.alt:
                 # Take the longest prefix from the list arcs such that
                 # all have the same property
@@ -741,10 +731,14 @@ class PropertyBoxList():
                         self._properties.append(PropertyBox(self.context.clone(), groupp, descr, [v for (_,v) in arcs_for_groupp]))
 
     def resolveDescription(self, descr):
-        """Takes a propertyDescription returns a list of arcs, i.e. (propertyNode, valueNode) pairs"""
+        """Takes a propertyDescription returns a list of arcs, i.e.
+        (propertyNode, valueNode) pairs. propertyNode is always a
+        URIRef or None."""
         # We support property descriptions with more than one property
         arcs = []
         for prop in descr.properties:
+            if isinstance(prop, BNode):
+                raise FresnelException("Found blank node as property")
             if isinstance(prop, Literal):
                 # A SPARQL or FSL query
                 if prop.datatype == fresnel.sparqlSelector:
@@ -752,6 +746,8 @@ class PropertyBoxList():
                     # It must have the bindings ?prop ?obj in this order.
                     res = self.context.instanceGraph.query(prop, initBindings={ "?target": self.resourceNode })
                     for r in res:
+                        if not (r[0] is None or isinstance(r[0], URIRef)):
+                            raise FresnelException("SPARQL query returned a literal or a blank node as ?prop")
                         arcs.append((r[0],r[1]))
                 else:
                     raise FresnelException("Unsupported selector language {}".format(prop.datatype))
@@ -900,19 +896,20 @@ class PropertyBox(Box):
 
     def __init__(self, context, referenceProperty, propertyDescription, valueNodes):
         """
-        referenceProperty: The Box represents this property. If it is
-        a BNode, it is thought to be a constructed property that
-        doesn't exist. In this case it can't be matched by a format or
-        labelLens, but propertyDescription can still refer to a format
-        or set a label.
+        referenceProperty: The Box represents this property. It must
+        be a URIRef or None. If it is None, it is thought to be a constructed
+        property that doesn't exist. In this case it can't be matched by a
+        format or labelLens, but propertyDescription can still refer to a
+        format or set a label.
         propertyDescription: The PropertyDescription from which this
         PropertyBox is derived. Some information, like sublenses and
         label are taken from this.
         values: The nodes which constitute the values that are shown
         in this box.
         """
+        assert referenceProperty is None or isinstance(referenceProperty, URIRef)
         super().__init__(context)
-        self.referenceProperty = referenceProperty if isinstance(referenceProperty,URIRef) else None
+        self.referenceProperty = referenceProperty
         self.propertyDescription = propertyDescription
         self.label = None
         self.valueNodes = valueNodes
@@ -942,9 +939,12 @@ class PropertyBox(Box):
         # Call select
         for v in self.values:
             v.select()
-        # create a LabelBox (which will find a lens on its own)
-        labelNode = self.propertyDescription.label or self.propertyDescription.properties[0]
-        if not self.context.label:
+        # create a LabelBox (which will find a lens on its own), but
+        # do not create one if we are already inside a label.
+        # If there is no manual label and no reference property, we
+        # can not put a label.
+        labelNode = self.propertyDescription.label or self.referenceProperty
+        if (not self.context.label) and labelNode:
             self.label = LabelBox(self.context.clone(label=True), labelNode)
             self.label.select()
 
@@ -964,12 +964,12 @@ class PropertyBox(Box):
         for v in self.values: v.portray(self.fmt)
 
     def transform(self):
-        uri_attr = self.propertyDescription.uri
+        uri_attr = self.referenceProperty
         return E.property(
             self._transform_format(),
             self.label.transform() if self.label else "",
             *[v.transform() for v in self.values],
-            **({"uri": uri_attr} if uri_attr else {})
+            **({"uri": str(uri_attr)} if uri_attr else {})
         )
 
     def __str__(self):
