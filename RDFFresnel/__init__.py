@@ -537,7 +537,7 @@ class Format(FresnelNode):
 
         value: a literal of type fresnel:styleClass
         http://www.w3.org/2005/04/fresnel-info/manual/#csshooking"""
-        return Style(self.nodeProp(fresnel.valueStyle))
+        return Style(self.nodeProps(fresnel.valueStyle))
 
     # Note: containerStyle only exists on groups
 
