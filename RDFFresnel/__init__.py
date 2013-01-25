@@ -37,7 +37,7 @@ E = ElementMaker(namespace=fresnelxml)
 def prettify(tree):
     tag = lambda localname: "{{{0}}}{1}".format(fresnelxml, localname)
     for e in tree.iter():
-        print("tag", e.tag)
+        print("tag", e.tag, file=sys.stderr)
         if e.tag in [ tag("resource"), tag("property"), tag("label"), tag("value") ]:
             e.tail = e.tail or "\n"
         if e.tag in [ tag("resource"), tag("property"), tag("value") ]:
@@ -230,7 +230,7 @@ class Context:
 
             for selector in propertySelectors:
                 # TODO: subproperty reasoning?
-                print("Property selector test {0} == {1}".format(targetNode, selector))
+                print("Property selector test {0} == {1}".format(targetNode, selector), file=sys.stderr)
                 if isinstance(selector, Literal):
                     # A SPARQL or FSL query
                     if selector.datatype == fresnel.sparqlSelector:
