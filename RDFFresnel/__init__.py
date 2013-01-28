@@ -670,11 +670,11 @@ class PropertyDescription(FresnelNode):
                 self.alt = False
                 self.merge = False
             elif mergeprops:
-                self.properties = tuple(Collection(mergeprops))
+                self.properties = tuple(Collection(fresnelGraph, mergeprops))
                 self.alt = False
                 self.merge = True
             elif altprops:
-                self.properties = tuple(Collection(altprops))
+                self.properties = tuple(Collection(fresnelGraph, altprops))
                 self.alt = True
                 self.merge = False
             else:
