@@ -646,7 +646,7 @@ class FormatHook(FresnelNode):
 
 
 class PropertyDescription(FresnelNode):
-    __slots__ = ("sublenses", "properties", "depth", "label", "alt", "merge")
+    __slots__ = ("sublenses", "properties", "depth", "label", "alt", "merge", "useFmt")
 
     def __init__(self, fresnelGraph, node):
         """node: property description in fresnel Graph"""
@@ -660,6 +660,7 @@ class PropertyDescription(FresnelNode):
             self.label = None
             self.alt = False
             self.merge = False
+            self.useFmt = None
         elif fresnel.PropertyDescription in self.nodeProps(rdf.type):
             self.sublenses = [Lens(fresnelGraph, s) for s in self.nodeProps(fresnel.sublens)]
             props = self.nodeProps(fresnel.property)
@@ -681,6 +682,11 @@ class PropertyDescription(FresnelNode):
                 FresnelException("Property description without fresnel:properties, fresnel:mergeProperties or fresnel:alternateProperties")
             self.depth = self.nodeProp(fresnel.depth)
             self.label = self.nodeProp(fresnel.label)
+            self.useFmt = None
+            for f in self.nodeProps(fresnel.use):
+                if (f, rdf.type, fresnel.Format) in fresnelGraph:
+                    self.useFmt = Format(fresnelGraph, f)
+
         else:
             self.sublenses = ()
             self.properties = (node,)
@@ -688,6 +694,7 @@ class PropertyDescription(FresnelNode):
             self.label = None
             self.alt = False
             self.merge = False
+            self.useFmt = None
 
 class PropertyBoxList():
     """A list of all properties of a resource as given by a lens. This
@@ -957,6 +964,8 @@ class PropertyBox(Box):
     def portray(self):
         if self.referenceProperty:
             self.fmt = self.context.propertyfmt(self.referenceProperty)
+        if self.propertyDescription.useFmt:
+            self.fmt = self.propertyDescription.useFmt
         if self.fmt:
             self.style = self.fmt.propertyStyle
             self._apply_format_hook(self.fmt.propertyFormat)
