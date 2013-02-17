@@ -34,16 +34,6 @@ fresnelxml = "http://www.andonyar.com/rec/2012/sempipe/fresnelxml"
 
 E = ElementMaker(namespace=fresnelxml)
 
-def prettify(tree):
-    tag = lambda localname: "{{{0}}}{1}".format(fresnelxml, localname)
-    for e in tree.iter():
-        print("tag", e.tag, file=sys.stderr)
-        if e.tag in [ tag("resource"), tag("property"), tag("label"), tag("value") ]:
-            e.tail = e.tail or "\n"
-        if e.tag in [ tag("resource"), tag("property"), tag("value") ]:
-            if "type" not in e or e["type"] != "literal":
-                e.text = e.text or "\n"
-
 class FresnelException(Exception):
     pass
 
