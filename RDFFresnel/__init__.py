@@ -220,7 +220,6 @@ class Context:
 
             for selector in propertySelectors:
                 # TODO: subproperty reasoning?
-                print("Property selector test {0} == {1}".format(targetNode, selector), file=sys.stderr)
                 if isinstance(selector, Literal):
                     # A SPARQL or FSL query
                     if selector.datatype == fresnel.sparqlSelector:
@@ -248,7 +247,6 @@ class Context:
 
         available_langs: a sequence of languages, unordered"""
 
-        print("Picking language from {}".format(available_langs), file=sys.stderr)
         matches = [l for l in self.langs if l in available_langs]
         if (matches): return matches[0]
         else: return None
