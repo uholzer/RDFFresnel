@@ -1,0 +1,46 @@
+===================================
+  RDF Fresnel Renderer for RDFLib
+===================================
+
+RDFFresnel is a partial implementation of Fresnel[1] on top of
+RDFLib[2]. It supports SPARQL selectors, but not FSL selectors. Some
+enhancements beyond [1] have been added.
+
+Requirements:
+- Python 3
+- rdflib
+- rdflib-sparql
+- lxml
+
+Usage:
+    import rdflib
+    from RDFFresnel import Context, ContainerBox
+
+    # A graph containing the lenses and one containing instance data
+    fresnelGraph = rdflib.Graph()
+    instanceGraph = rdflib.Graph()
+    
+    # Fill graphs with triples
+    ...
+
+    # Create an initial context
+    ctx = Fresnel.Context(fresnelGraph=fresnelGraph, instanceGraph=instanceGraph)
+
+    # A container which holds rendered resources
+    box = Fresnel.ContainerBox(ctx)
+    box.append(rdflib.URIRef("http://example.org/some_resource_to_render"))
+
+    # Select a subtree of the RDF graph according to the lenses
+    box.select()
+    # Apply formats to the tree according to Fresnel formats
+    box.portray()
+    # Transform resulting data structure to XML
+    tree = box.transform()
+    # Write XML to a file
+    somefile.write(etree.tostring(tree,encoding="UTF-8",xml_declaration=True)
+
+[1] http://www.w3.org/2005/04/fresnel-info/manual/
+[2] https://github.com/RDFLib/rdflib
+
+-- Urs Holzer <urs@andonyar.com>
+
