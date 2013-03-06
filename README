@@ -2,6 +2,9 @@
   RDF Fresnel Renderer for RDFLib
 ===================================
 
+IMPORTANT: File formats and interfaces are not yet stable! Significant
+changes to the Python interface and the XML output will be made!
+
 RDFFresnel is a partial implementation of Fresnel[1] on top of
 RDFLib[2]. It supports SPARQL selectors, but not FSL selectors. Some
 enhancements beyond [1] have been added.
