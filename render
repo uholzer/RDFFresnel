@@ -1,0 +1,43 @@
+#!/usr/bin/python3
+
+import argparse
+from sys import stdout
+from lxml import etree
+
+from rdflib import Graph, URIRef
+from RDFFresnel import Context, ContainerBox
+
+argparser = argparse.ArgumentParser(description='Render RDF resources using Fresnel')
+argparser.add_argument('resources', nargs='+', metavar='URI',
+                    help=('Resource to be rendered'))
+argparser.add_argument('--instances', metavar='FILE', dest='instances', required=True,
+                    help=('File containing RDF instance data'))
+argparser.add_argument('--instances-format', metavar='FILE', dest='instances_format',
+                    help=('Format of data file'))
+argparser.add_argument('--lenses', metavar='FILE', dest='lenses',
+                    help=('File containing Fresnel Lenses (if not given, the same as for --data is used)'))
+argparser.add_argument('--lenses-format', metavar='FILE', dest='lenses_format',
+                    help=('Format of lenses file'))
+
+args = argparser.parse_args()
+
+instances = Graph()
+instances.load(args.instances, format=args.instances_format)
+
+if args.lenses:
+    lenses = Graph()
+    lenses.load(args.lenses, format=args.lenses_format)
+else:
+    lenses = instances
+
+
+ctx = Context(fresnelGraph=lenses, instanceGraph=instances)
+box = ContainerBox(ctx)
+for r in args.resources:
+    box.append(URIRef(r))
+
+box.select()
+box.portray()
+tree = box.transform()
+stdout.buffer.write(etree.tostring(tree,encoding="UTF-8",xml_declaration=True))
+

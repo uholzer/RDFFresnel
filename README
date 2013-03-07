@@ -15,7 +15,12 @@ Requirements:
 - rdflib-sparql
 - lxml
 
-Usage:
+Usage of the command line tool render:
+    render --instances stuff.rdf \
+           --lenses lenses.n3 --lenses-format n3 \
+           http://example.org/thing
+
+Usage of the library:
     import rdflib
     from RDFFresnel import Context, ContainerBox
 
