@@ -27,10 +27,10 @@ Usage:
     ...
 
     # Create an initial context
-    ctx = Fresnel.Context(fresnelGraph=fresnelGraph, instanceGraph=instanceGraph)
+    ctx = Context(fresnelGraph=fresnelGraph, instanceGraph=instanceGraph)
 
     # A container which holds rendered resources
-    box = Fresnel.ContainerBox(ctx)
+    box = ContainerBox(ctx)
     box.append(rdflib.URIRef("http://example.org/some_resource_to_render"))
 
     # Select a subtree of the RDF graph according to the lenses
