@@ -15,10 +15,15 @@ Requirements:
 - rdflib-sparql
 - lxml
 
-Usage of the command line tool render:
-    render --instances stuff.rdf \
-           --lenses lenses.n3 --lenses-format n3 \
-           http://example.org/thing
+Installation:
+    python3 setup.py install
+If you want to install to your home directory instead, use
+    python3 setup.py install --user
+
+Usage of the command line tool rdffresnel-render:
+    rdffresnel-render --instances stuff.rdf \
+                      --lenses lenses.n3 --lenses-format n3 \
+                      http://example.org/thing
 
 Usage of the library:
     import rdflib
