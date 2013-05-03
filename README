@@ -15,6 +15,9 @@ Requirements:
 - rdflib-sparql
 - lxml
 
+Recommended:
+- Any XSLT 1.0 processor (for example xsltproc[3])
+
 Installation:
     python3 setup.py install
 If you want to install to your home directory instead, use
@@ -23,7 +26,14 @@ If you want to install to your home directory instead, use
 Usage of the command line tool rdffresnel-render:
     rdffresnel-render --instances stuff.rdf \
                       --lenses lenses.n3 --lenses-format n3 \
-                      http://example.org/thing
+                      http://example.org/thing > out.xml
+
+You likely want to transform the output with an XSLT processor using
+one of the stylesheets shipped with this package. By default they are
+installed in /usr/local/share/RDFFresnel/transforms or
+~/.local/share/RDFFresnel/transforms. For example:
+    xsltproc /usr/local/share/RDFFresnel/transforms/fresneltoxhtml5.xsl \
+             out.xml > final.xhtml
 
 Usage of the library:
     import rdflib
@@ -54,6 +64,7 @@ Usage of the library:
 
 [1] http://www.w3.org/2005/04/fresnel-info/manual/
 [2] https://github.com/RDFLib/rdflib
+[3] http://xmlsoft.org/XSLT/xsltproc.html
 
 -- Urs Holzer <urs@andonyar.com>
 

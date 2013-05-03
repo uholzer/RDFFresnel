@@ -10,6 +10,15 @@ setup(name='RDFFresnel',
       url='https://github.com/uholzer/RDFFresnel',
       packages=['RDFFresnel'],
       scripts=['scripts/rdffresnel-render'],
+      data_files=[
+            ('share/RDFFresnel/transforms', [
+                'transforms/fresnelprettyprint.xsl',
+                'transforms/fresnelsort.xsl', 
+                'transforms/fresneltoxhtml5.xsl', 
+                'transforms/xhtml5tohtml5.xsl', 
+                'transforms/xhtml5toxhtml1.xsl'
+            ])
+      ],
       keywords=['Requires: rdflib'],
       classifiers=[
             "Programming Language :: Python :: 3",
