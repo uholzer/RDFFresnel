@@ -1,7 +1,8 @@
 #!/usr/bin/python3
 
 import argparse
-from sys import stdout
+from sys import stdout, argv
+import logging
 from lxml import etree
 
 from rdflib import Graph, URIRef
@@ -18,8 +19,13 @@ argparser.add_argument('--lenses', metavar='FILE', dest='lenses',
                     help=('File containing Fresnel Lenses (if not given, the same as for --data is used)'))
 argparser.add_argument('--lenses-format', metavar='FILE', dest='lenses_format',
                     help=('Format of lenses file'))
+argparser.add_argument('-v', '--verbose', action='store_true', dest='verbose',
+                    help=("Verbose debugging output, useful if you don't get the result you expect"))
 
 args = argparser.parse_args()
+
+if args.verbose:
+    logging.basicConfig(format=argv[0].split('/')[-1]+': %(levelname)s: %(message)s', level=logging.INFO)
 
 instances = Graph()
 instances.load(args.instances, format=args.instances_format)

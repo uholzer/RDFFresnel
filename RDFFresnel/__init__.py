@@ -10,6 +10,7 @@
 import sys
 from functools import reduce
 import itertools
+from logging import warning, info
 
 import rdflib
 from rdflib import URIRef, Graph, Namespace, Literal, BNode, URIRef
@@ -119,7 +120,7 @@ class Context:
         # Reduce to lenses that match
         lensesmatched = list(filter(lambda x: x[1], ((l,self.matches(l,target)) for l in lenses)))
         if not lensesmatched:
-            print("warning: No lens for {0}".format(target), file=sys.stderr)
+            info("No lens for {0}".format(target))
             return self.fallbackLabelLens if self.label else self.fallbackLens
         lensesmatched.sort(key=lambda x: x[1])
         # Now get all lenses with maximal quality
@@ -130,7 +131,7 @@ class Context:
             lensesmatched_new = [x for x in lensesmatched if fresnel.defaultLens in x[0].purposes]
             lensesmatched = lensesmatched_new if lensesmatched_new else lensesmatched
         if (len(lensesmatched) > 1):
-            print("warning: more than one lens could be used for {0}".format(target), file=sys.stderr)
+            warning("more than one lens could be used for {0}".format(target))
         return lensesmatched[0][0]
 
     def fmt(self, prop=False):
@@ -148,7 +149,7 @@ class Context:
         # Now get all formats with maximal quality
         fmtsmatched = [x for x in fmtsmatched if x[1]==fmtsmatched[0][1]]
         if (len(fmtsmatched) > 1):
-            print("warning: more than one format could be used for {0}".format(target), file=sys.stderr)
+            warning("more than one format could be used for {0}".format(target))
         return fmtsmatched[0][0]
 
     def propertyfmt(self, propertyNode):
