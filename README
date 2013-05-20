@@ -71,63 +71,76 @@ processing instead of writing a Python script around RDFFresnel.
 The namespace is http://www.andonyar.com/rec/2012/sempipe/fresnelxml
 and ft: is usually used as prefix.
 
-Element fresnelresult
-    Root element. Corresponds to the class ContainerBox.
-    Only contains resource elements.
+Box Model Elements:
 
-Element resource
-    Represents a rendered resource. Corresponds to ResourceBox.
-    Can only be contained in fresnelresult and value elements.
-    Attribute lens: URI of the employed lens
-    Attribute uri: URI of the resource
+    Correspond to Fresnel's box model.
 
-Element property
-    Corresponds to PropertyBox.
-    Is always a child of resource or label.
-    Attribute uri: URI of the RDF property (may be missing)
+    fresnelresult
+        Root element. Corresponds to the class ContainerBox.
+        Only contains resource elements.
 
-Element value
-    Corresponds to ValueBox.
-    Contains the value of a property.
-    Is always a child of property.
-    Attribute type: 'literal' for stings, 'xml' for xml content.
+    resource
+        Represents a rendered resource. Corresponds to ResourceBox.
+        Can only be contained in fresnelresult and value elements.
+        Attribute lens: URI of the employed lens
+        Attribute uri: URI of the resource
 
-Element label
-    A label of a property or a resource.
-    Is always a child of property or resource.
+    property
+        Corresponds to PropertyBox.
+        Is always a child of resource or label.
+        Attribute uri: URI of the RDF property (may be missing)
 
-Element format
-    Provides information about the chosen format.
-    Can turn up in any element that can be formatted.
-    Can contain the elements described below, depending on whether the
-    format has the corresponding property. Note that it is the
-    responsibility of the user to decide whether and how the contents
-    of these elements should be shown to the user.
-    Attribute fmt: Contains the URI of the applied format.
-    Attribute class: Contains the value of the format's
-                     fresnel:resourceStyle, fresnel:propertyStyle, 
-                     fresnel:valueStyle, or fresnel:labelStyle property
-                     which if it is of type fresnel:styleClass.
-    Attribute class: Contains the value of the format's
-                     fresnel:resourceStyle, fresnel:propertyStyle,
-                     fresnel:valueStyle, or fresnel:labelStyle property
-                     which if it is of type fresnel:stylingInstruction.
-    
-Element contentBefore
-    Contains the format's fresnel:contentBefore
+    value
+        Corresponds to ValueBox.
+        Contains the value of a property.
+        Is always a child of property.
+        Attribute type: 'literal' for stings, 'xml' for xml content
+        Attribute lang: In case of a literal, contains its language
+        Attribute datatype: In case of a literal, contains its datatyoe
 
-Element contentAfter
-    Contains the format's fresnel:contentAfter
+    label
+        A label of a property or a resource.
+        Is always a child of property or resource.
 
-Element contentFirst
-    Contains the format's fresnel:contentFirst
+    literal
+        Is a child of a value element representing a literal and
+        contains its value as string.
 
-Element contentLast
-    Contains the format's fresnel:contentLast
+Elements with additional content provided by formats:
 
-Element contentNoValue
-    Contains the format's fresnel:contentNoValue
+    These elements may be children of any box model element.
 
+    contentBefore
+        Contains the format's fresnel:contentBefore
+
+    contentAfter
+        Contains the format's fresnel:contentAfter
+
+    contentFirst
+        Contains the format's fresnel:contentFirst
+
+    contentLast
+        Contains the format's fresnel:contentLast
+
+    contentNoValue
+        Contains the format's fresnel:contentNoValue
+
+Attributes set by formats:
+
+    May be set on any box model element.
+
+    fmt
+        Contains the URI of the applied format.
+
+    class
+        Contains the value of literals of type fresnel:styleClass from
+        the format's fresnel:resourceStyle, fresnel:propertyStyle,
+        fresnel:valueStyle, or fresnel:labelStyle property respectively.
+
+    style
+        Contains the value of literals of type fresnel:stylingInstruction
+        from the format's fresnel:resourceStyle, fresnel:propertyStyle,
+        fresnel:valueStyle, or fresnel:labelStyle property respectively.
 
 
 
