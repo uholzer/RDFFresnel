@@ -772,20 +772,18 @@ class Box:
         self.context = context
 
     def _transform_format(self):
-        content = []
         attrs = dict()
-        for k in ("contentFirst", "contentBefore", "contentAfter", "contentLast", "contentNoValue"):
+        elements_before = []
+        elements_after = []
+        for k in ("contentFirst", "contentBefore", "contentNoValue"):
             if getattr(self, k):
-                content.append(E(k, str(getattr(self, k))))
+                elements_before.append(E(k, str(getattr(self, k))))
+        for k in ("contentAfter", "contentLast"):
+            if getattr(self, k):
+                content_after.append(E(k, str(getattr(self, k))))
         if self.style: attrs.update(self.style.attrs)
         if self.fmt: attrs["fmt"] = str(self.fmt.node)
-        if content or self.style or self.fmt:
-            return E.format(
-                *content,
-                **attrs
-            )
-        else:
-            return ""
+        return attrs, elements_before, elements_after
 
     def _apply_format_hook(self, hook):
         if hook:
@@ -828,10 +826,13 @@ class ContainerBox(Box):
         for n in self.resources: n.portray()
 
     def transform(self):
+        (f_attrs, f_before, f_after) = self._transform_format()
         return etree.ElementTree(
             E.fresnelresult(
-                self._transform_format(),
-                *[r.transform() for r in self.resources]
+                *(f_before +
+                  [r.transform() for r in self.resources] +
+                  f_after),
+                **f_attrs
             )
         )
 
@@ -880,10 +881,13 @@ class ResourceBox(Box):
         attributes["uri"] = self.resourceNode
         if self.lens:
             attributes["lens"] = self.lens.node
+        (f_attrs, f_before, f_after) = self._transform_format()
+        attributes.update(f_attrs)
         return E.resource(
-            self._transform_format(),
-            self.label.transform() if self.label else "",
-            *[p.transform() for p in self.properties],
+            *(f_before +
+              [self.label.transform() if self.label else ""] +
+              [p.transform() for p in self.properties] +
+              f_after),
             **attributes
         )
 
@@ -969,11 +973,15 @@ class PropertyBox(Box):
 
     def transform(self):
         uri_attr = self.referenceProperty
+        (f_attrs, f_before, f_after) = self._transform_format()
+        attributes = {"uri": str(uri_attr)} if uri_attr else {}
+        attributes.update(f_attrs)
         return E.property(
-            self._transform_format(),
-            self.label.transform() if self.label else "",
-            *[v.transform() for v in self.values],
-            **({"uri": str(uri_attr)} if uri_attr else {})
+            *(f_before +
+              [self.label.transform() if self.label else ""] +
+              [v.transform() for v in self.values] +
+              f_after),
+            **attributes
         )
 
     def __str__(self):
@@ -1020,16 +1028,21 @@ class LabelBox(Box):
         for p in self.properties: p.portray()
 
     def transform(self):
+        (f_attrs, f_before, f_after) = self._transform_format()
         if self.isManual:
             return E.label(
-                self._transform_format(),
-                str(self.node)
+                *(f_before +
+                  [str(self.node)] +
+                  f_after),
+                **f_attrs
             )
         else:
             attributes = { "lens": self.lens.node } if self.lens else {}
+            attributes.update(f_attrs)
             return E.label(
-                self._transform_format(),
-                *[p.transform() for p in self.properties],
+                *(f_before +
+                 [p.transform() for p in self.properties] +
+                 f_after),
                 **attributes
             )
 
@@ -1068,14 +1081,17 @@ class ValueBox(Box):
             self.content.portray()
 
     def transform(self):
+        (f_attrs, f_before, f_after) = self._transform_format()
         if isinstance(self.content, Box):
             return E.value(
-                self._transform_format(),
-                self.content.transform(),
-                type = "resource"
+                *(f_before +
+                  [self.content.transform()] +
+                  f_after),
+                type = "resource",
+                **f_attrs
             )
         else:
-            litinfo = dict()
+            litinfo = {'type': 'literal'}
             if self.content.language: litinfo["lang"] = self.content.language
             if self.content.datatype: litinfo["datatype"] = self.content.datatype
             litcontent = str(self.content)
@@ -1087,10 +1103,11 @@ class ValueBox(Box):
                 litcontent = etree.fromstring(parseable)
             else:
                 litcontent = E.literal(litcontent)
+            litinfo.update(f_attrs)
             return E.value(
-                self._transform_format(),
-                litcontent,
-                type = "literal",
+                *(f_before +
+                  [litcontent] +
+                  f_after),
                 **litinfo
             )
 
