@@ -10,7 +10,7 @@ directly. -->
     xmlns:fn    = "http://www.w3.org/2005/xpath-functions"
     xmlns:rdf   = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
     xmlns:foaf  = "http://xmlns.com/foaf/0.1/"
-    xmlns:fres  = "http://www.andonyar.com/rec/2012/sempipe/fresnelxml"
+    xmlns:ft    = "http://www.andonyar.com/rec/2012/sempipe/fresnelxml"
     xmlns:xhtml = "http://www.w3.org/1999/xhtml"
     xmlns       = "http://www.w3.org/1999/xhtml"
     exclude-result-prefixes="xsl fn rdf foaf fres xhtml"
@@ -23,10 +23,10 @@ directly. -->
 
 <!-- Root element -->
 
-<xsl:template match="/fres:fresnelresult">
+<xsl:template match="/ft:fresnelresult">
     <html>
     <head>
-        <title><xsl:value-of select="/fres:fresnelresult/fres:resource/fres:label"/></title>
+        <title><xsl:value-of select="/ft:fresnelresult/ft:resource/ft:label"/></title>
         <style type="text/css"><![CDATA[
             @namespace html     "http://www.w3.org/1999/xhtml";
             .figure { float: right }
@@ -34,27 +34,27 @@ directly. -->
         ]]></style>
     </head>
     <body>
-        <h1><xsl:apply-templates select="/fres:fresnelresult/fres:resource/fres:label"/></h1>
-        <xsl:apply-templates select="fres:resource"/>
+        <h1><xsl:apply-templates select="/ft:fresnelresult/ft:resource/ft:label"/></h1>
+        <xsl:apply-templates select="ft:resource"/>
     </body>
     </html>
 </xsl:template>
 
-<!-- fres:resource -->
+<!-- ft:resource -->
 
-<xsl:template match="fres:resource[contains(fres:format/@class,'html:dl')]">
-    <xsl:apply-templates select="fres:property[contains(fres:format/@class,'out-of-order:before')]"/>
+<xsl:template match="ft:resource[contains(@class,'html:dl')]">
+    <xsl:apply-templates select="ft:property[contains(@class,'out-of-order:before')]"/>
     <dl>
-    <xsl:apply-templates select="fres:property[not(contains(fres:format/@class,'out-of-order'))]" mode="dl"/>
+    <xsl:apply-templates select="ft:property[not(contains(@class,'out-of-order'))]" mode="dl"/>
     </dl>
-    <xsl:apply-templates select="fres:property[contains(fres:format/@class,'out-of-order:after')]"/>
+    <xsl:apply-templates select="ft:property[contains(@class,'out-of-order:after')]"/>
 </xsl:template>
 
-<xsl:template match="fres:resource" mode="img">
+<xsl:template match="ft:resource" mode="img">
     <img src="{@uri}">
         <xsl:choose>
-        <xsl:when test="string(fres:label)">
-            <xsl:attribute name="alt"><xsl:value-of select="fres:label"/></xsl:attribute>
+        <xsl:when test="string(ft:label)">
+            <xsl:attribute name="alt"><xsl:value-of select="ft:label"/></xsl:attribute>
         </xsl:when>
         <xsl:otherwise>
             <xsl:message>
@@ -66,84 +66,84 @@ directly. -->
     </img>
 </xsl:template>
 
-<xsl:template match="fres:resource">
+<xsl:template match="ft:resource">
     <!-- Should we place a label here too? -->
-    <xsl:apply-templates select="fres:property"/>
+    <xsl:apply-templates select="ft:property"/>
 </xsl:template>
 
-<xsl:template match="fres:resource[not(fres:property)]">
-    <xsl:apply-templates select="fres:label"/>
+<xsl:template match="ft:resource[not(ft:property)]">
+    <xsl:apply-templates select="ft:label"/>
 </xsl:template>
 
-<xsl:template match="fres:resource[not(fres:property) and not(string(fres:label))]">
+<xsl:template match="ft:resource[not(ft:property) and not(string(ft:label))]">
     <!-- Label is missing and no property is present, still we should
          show something. -->
     <xsl:value-of select="@uri"/>
 </xsl:template>
 
-<!-- fres:property -->
+<!-- ft:property -->
 
-<xsl:template match="fres:property[contains(fres:format/@class,'figure')]">
-    <xsl:apply-templates select="fres:format" mode="contentBefore"/>
-    <div class="{fres:format/@class}">
-    <xsl:apply-templates select="fres:label"/>
-    <xsl:apply-templates select="fres:value"/>
-    <xsl:apply-templates select="fres:format" mode="contentNoValue"/>
+<xsl:template match="ft:property[contains(@class,'figure')]">
+    <xsl:call-template name="contentBefore"/>
+    <div class="{@class}">
+    <xsl:apply-templates select="ft:label"/>
+    <xsl:apply-templates select="ft:value"/>
+    <xsl:call-template name="contentNoValue"/>
     </div>
-    <xsl:apply-templates select="fres:format" mode="contentAfter"/>
+    <xsl:call-template name="contentAfter"/>
 </xsl:template>
 
-<xsl:template match="fres:property">
-    <!--<xsl:apply-templates select="fres:format" mode="contentBefore"/>-->
-    <xsl:apply-templates select="fres:label"/>
-    <xsl:apply-templates select="fres:value"/>
-    <xsl:apply-templates select="fres:format" mode="contentNoValue"/>
-    <xsl:apply-templates select="fres:format" mode="contentAfter"/>
+<xsl:template match="ft:property">
+    <xsl:call-template name="contentBefore"/>
+    <xsl:apply-templates select="ft:label"/>
+    <xsl:apply-templates select="ft:value"/>
+    <xsl:call-template name="contentNoValue"/>
+    <xsl:call-template name="contentAfter"/>
 </xsl:template>
 
-<xsl:template match="fres:property" mode="dl">
-    <xsl:apply-templates select="fres:format" mode="contentBefore"/>
-    <dt><xsl:apply-templates select="fres:label"/></dt>
-    <xsl:for-each select="fres:value">
-    <dd><xsl:apply-templates select="."/><xsl:apply-templates select="fres:format" mode="contentNoValue"/></dd>
+<xsl:template match="ft:property" mode="dl">
+    <xsl:call-template name="contentBefore"/>
+    <dt><xsl:apply-templates select="ft:label"/></dt>
+    <xsl:for-each select="ft:value">
+    <dd><xsl:apply-templates select="."/><xsl:call-template name="contentNoValue"/></dd>
     </xsl:for-each>
-    <xsl:apply-templates select="fres:format" mode="contentAfter"/>
+    <xsl:call-template name="contentAfter"/>
 </xsl:template>
 
-<!-- fres:value -->
+<!-- ft:value -->
 
-<xsl:template match="fres:value[@type='literal']">
-    <xsl:apply-templates select="fres:format" mode="contentBefore"/>
+<xsl:template match="ft:value[@type='literal']">
+    <xsl:call-template name="contentBefore"/>
     <!-- We need to support arbitrary XML here, therefore we use
     copy-of instead of value-of. -->
-    <xsl:copy-of select="(fres:literal|fres:xmlliteral)/child::node()"/>
-    <xsl:apply-templates select="fres:format" mode="contentAfter"/>
+    <xsl:copy-of select="(ft:literal|ft:xmlliteral)/child::node()"/>
+    <xsl:call-template name="contentAfter"/>
 </xsl:template>
 
-<xsl:template match="fres:value[contains(fres:format/@class,'html:section')]">
-    <xsl:apply-templates select="fres:format" mode="contentBefore"/>
+<xsl:template match="ft:value[contains(@class,'html:section')]">
+    <xsl:call-template name="contentBefore"/>
     <section>
-        <h1><xsl:apply-templates select="fres:resource/fres:label"/></h1>
-        <xsl:apply-templates select="fres:resource"/>
+        <h1><xsl:apply-templates select="ft:resource/ft:label"/></h1>
+        <xsl:apply-templates select="ft:resource"/>
     </section>
-    <xsl:apply-templates select="fres:format" mode="contentAfter"/>
+    <xsl:call-template name="contentAfter"/>
 </xsl:template>
 
-<xsl:template match="fres:value[contains(fres:format/@class,'html:img')]">
-    <xsl:apply-templates select="fres:format" mode="contentBefore"/>
-    <xsl:apply-templates select="fres:resource" mode="img"/>
-    <xsl:apply-templates select="fres:format" mode="contentAfter"/>
+<xsl:template match="ft:value[contains(@class,'html:img')]">
+    <xsl:call-template name="contentBefore"/>
+    <xsl:apply-templates select="ft:resource" mode="img"/>
+    <xsl:call-template name="contentAfter"/>
 </xsl:template>
 
-<xsl:template match="fres:value">
-    <xsl:apply-templates select="fres:format" mode="contentBefore"/>
-    <xsl:apply-templates select="fres:resource"/>
-    <xsl:apply-templates select="fres:format" mode="contentAfter"/>
+<xsl:template match="ft:value">
+    <xsl:call-template name="contentBefore"/>
+    <xsl:apply-templates select="ft:resource"/>
+    <xsl:call-template name="contentAfter"/>
 </xsl:template>
 
-<!-- fres:label -->
+<!-- ft:label -->
 
-<xsl:template match="fres:label">
+<xsl:template match="ft:label">
     <xsl:choose>
     <xsl:when test="not(string(.))">
         <xsl:value-of select="../@uri"/>
@@ -157,45 +157,45 @@ directly. -->
 <!-- Additional content -->
 <!-- IMPORTANT:
     I think it should be
-    ../preceding-sibling::fres:property[1] or ../preceding-sibling::fres:value[1]
+    ../preceding-sibling::ft:property[1] or ../preceding-sibling::ft:value[1]
     instead of
-    ../preceding-sibling::fres:property[2] or ../preceding-sibling::fres:value[2]
+    ../preceding-sibling::ft:property[2] or ../preceding-sibling::ft:value[2]
     I assume this to be a bug in libxml.
 -->
 
-<xsl:template match="fres:format" mode="contentBefore">
+<xsl:template name="contentBefore">
     <xsl:choose>
-        <xsl:when test="fres:contentLast and not(../preceding-sibling::fres:property[2] or ../preceding-sibling::fres:value[2])">
-            <xsl:apply-templates select="fres:contentFirst"/>
+        <xsl:when test="ft:contentLast and not(preceding-sibling::ft:property[2] or preceding-sibling::ft:value[2])">
+            <xsl:apply-templates select="ft:contentFirst"/>
         </xsl:when>
-        <xsl:when test="fres:contentBefore">
-            <xsl:apply-templates select="fres:contentBefore"/>
+        <xsl:when test="ft:contentBefore">
+            <xsl:apply-templates select="ft:contentBefore"/>
         </xsl:when>
     </xsl:choose>
 </xsl:template>
 
-<xsl:template match="fres:format" mode="contentAfter">
+<xsl:template name="contentAfter">
     <xsl:choose>
-        <xsl:when test="fres:contentLast and not(../following-sibling::fres:property[2] or ../following-sibling::fres:value[2])">
-            <xsl:apply-templates select="fres:contentLast"/>
+        <xsl:when test="ft:contentLast and not(following-sibling::ft:property[2] or following-sibling::ft:value[2])">
+            <xsl:apply-templates select="ft:contentLast"/>
         </xsl:when>
-        <xsl:when test="fres:contentAfter">
-            <xsl:apply-templates select="fres:contentAfter"/>
+        <xsl:when test="ft:contentAfter">
+            <xsl:apply-templates select="ft:contentAfter"/>
         </xsl:when>
     </xsl:choose>
 </xsl:template>
 
-<xsl:template match="fres:format" mode="contentNoValue">
-    <xsl:if test="not(../fres:value)">
-        <xsl:apply-templates select="fres:contentNoValue"/>
+<xsl:template name="contentNoValue">
+    <xsl:if test="not(ft:value)">
+        <xsl:apply-templates select="ft:contentNoValue"/>
     </xsl:if>
 </xsl:template>
 
-<xsl:template match="fres:contentAfter|fres:contentLast|fres:contentBefore|fres:contentFirst">
+<xsl:template match="ft:contentAfter|ft:contentLast|ft:contentBefore|ft:contentFirst">
     <xsl:copy-of select="child::node()"/>
 </xsl:template>
 
-<xsl:template match="fres:contentNoValue">
+<xsl:template match="ft:contentNoValue">
     <xsl:copy-of select="child::node()"/>
 </xsl:template>
 
