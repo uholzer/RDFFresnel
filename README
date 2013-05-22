@@ -142,6 +142,13 @@ Attributes set by formats:
         from the format's fresnel:resourceStyle, fresnel:propertyStyle,
         fresnel:valueStyle, or fresnel:labelStyle property respectively.
 
+Running tests:
+
+Run in the source directory
+
+    python3 -m unittest
+
+This automatically looks for all tests in the directory test.
 
 
 [1] http://www.w3.org/2005/04/fresnel-info/manual/
